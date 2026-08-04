@@ -32,10 +32,10 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-xl flex flex-col h-screen fixed left-0 top-0 z-40">
+    <aside className="w-64 border-r border-border bg-sidebar flex flex-col h-screen fixed left-0 top-0 z-40">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-primary flex items-center justify-center shadow-glow">
-          <ShieldAlert className="w-5 h-5 text-white" />
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-soft">
+          <ShieldAlert className="w-5 h-5 text-primary-foreground" />
         </div>
         <span className="font-bold text-lg tracking-tight text-foreground">Aegis Kinetic</span>
       </div>

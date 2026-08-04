@@ -22,11 +22,11 @@ export default function ScanResultsWorkspace() {
   const [activeTab, setActiveTab] = useState<'ai' | 'code' | 'graph' | 'taint'>('ai');
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] -mt-4 bg-background border border-border/50 rounded-xl overflow-hidden relative">
+    <div className="flex h-[calc(100vh-8rem)] -mt-4 bg-background border border-border rounded-card overflow-hidden relative shadow-soft">
       
       {/* Left Panel: Vulnerability List */}
-      <div className={`flex-shrink-0 w-full lg:w-[400px] border-r border-border bg-card/20 flex flex-col transition-all ${selectedVuln ? 'hidden lg:flex' : 'flex'}`}>
-        <div className="p-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-10 flex items-center justify-between">
+      <div className={`flex-shrink-0 w-full lg:w-[400px] border-r border-border bg-card flex flex-col transition-all ${selectedVuln ? 'hidden lg:flex' : 'flex'}`}>
+        <div className="p-4 border-b border-border bg-card sticky top-0 z-10 flex items-center justify-between">
           <div>
             <Link to={`/projects/${id}`} className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm font-medium mb-2">
               <ArrowLeft className="w-4 h-4" /> Back to Project
@@ -39,13 +39,13 @@ export default function ScanResultsWorkspace() {
           <Badge variant="destructive">4 Issues</Badge>
         </div>
         
-        <div className="p-3 border-b border-border bg-background/30">
+        <div className="p-3 border-b border-border bg-card">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input 
               type="text" 
               placeholder="Filter vulnerabilities..." 
-              className="w-full bg-muted/40 border border-border rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full bg-background border border-border rounded-input pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
             />
           </div>
         </div>
@@ -91,7 +91,7 @@ export default function ScanResultsWorkspace() {
           <div className="flex-1 flex flex-col overflow-hidden relative">
             
             {/* Detail Header */}
-            <header className="p-6 border-b border-border bg-card/10 flex items-start justify-between">
+            <header className="p-6 border-b border-border bg-card flex items-start justify-between">
               <div className="flex items-center gap-4 lg:hidden mb-4">
                 <Button variant="ghost" size="sm" onClick={() => setSelectedVuln(null)}>
                   <ArrowLeft className="w-4 h-4 mr-2" /> Back

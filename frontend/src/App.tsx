@@ -12,6 +12,7 @@ const ProjectDetail = lazy(() => import('./pages/projects/ProjectDetail'));
 const ScanConfig = lazy(() => import('./pages/projects/ScanConfig'));
 const ScanProgress = lazy(() => import('./pages/projects/ScanProgress'));
 const ScanResultsWorkspace = lazy(() => import('./pages/projects/ScanResultsWorkspace'));
+const ConnectRepo = lazy(() => import('./pages/projects/ConnectRepo'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -72,6 +73,7 @@ function App() {
             <Route path="/projects" element={<ProjectsList />} />
             <Route path="/projects/create" element={<CreateProject />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/connect" element={<ConnectRepo />} />
             <Route path="/projects/:id/scan-config" element={<ScanConfig />} />
             <Route path="/projects/:id/scan-progress" element={<ScanProgress />} />
             <Route path="/projects/:id/results" element={<ScanResultsWorkspace />} />

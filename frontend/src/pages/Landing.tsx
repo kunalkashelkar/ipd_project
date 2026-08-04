@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Crosshair, Network, GitBranch, ArrowRight } from 'lucide-react';
+import { ShieldCheck, ArrowRight, ArrowDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 
@@ -19,103 +19,86 @@ export default function Landing() {
   };
 
   return (
-    <div className="relative isolate px-6 pt-14 lg:px-8 bg-background min-h-screen">
-      <div className="mx-auto max-w-5xl py-24 sm:py-32 lg:py-40">
+    <div className="relative isolate bg-background min-h-screen flex flex-col">
+      {/* Public Navigation */}
+      <header className="px-6 lg:px-8 h-16 flex items-center justify-between border-b border-border bg-background">
+        <div className="flex items-center gap-8">
+          <Link to="/" className="flex items-center gap-2 font-bold text-foreground">
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            Aegis Kinetic
+          </Link>
+          <nav className="hidden md:flex gap-6 text-sm font-medium text-muted-foreground">
+            <Link to="#" className="hover:text-foreground transition-colors">Features</Link>
+            <Link to="#" className="hover:text-foreground transition-colors">Documentation</Link>
+            <Link to="#" className="hover:text-foreground transition-colors">Pricing</Link>
+          </nav>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            Login
+          </Link>
+          <Link to="/register">
+            <Button size="sm">Get Started</Button>
+          </Link>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32 lg:px-8 flex-1 flex flex-col items-center justify-center">
         <motion.div 
-          className="text-center"
+          className="text-center w-full"
           variants={containerVariants}
           initial="hidden"
           animate="show"
         >
-          <motion.div variants={itemVariants} className="mb-8 flex justify-center">
-            <span className="relative rounded-full px-5 py-1.5 text-sm font-semibold leading-6 text-primary ring-1 ring-primary/30 hover:ring-primary/60 transition-all bg-primary/10 shadow-glow flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              Aegis Kinetic v1.0 is now live
-            </span>
-          </motion.div>
-          
-          <motion.h1 variants={itemVariants} className="text-5xl font-bold tracking-tight text-foreground sm:text-7xl mb-8">
-            AI-Powered <span className="text-gradient hover:drop-shadow-[0_0_20px_rgba(6,182,212,0.6)] transition-all">Vulnerability Detection</span> <br /> Architecture
+          <motion.h1 variants={itemVariants} className="text-5xl font-bold tracking-tight text-foreground sm:text-7xl mb-6">
+            AI Powered <span className="text-primary">Vulnerability</span> Detection
           </motion.h1>
           
-          <motion.p variants={itemVariants} className="mt-6 text-lg leading-8 text-muted-foreground max-w-2xl mx-auto">
-            Secure your entire software supply chain using our 16-layer hybrid XAI pipeline. 
-            Identify vulnerabilities in code with unparalleled accuracy combining Graph Neural Networks and LLMs.
+          <motion.p variants={itemVariants} className="mt-4 text-xl leading-8 text-muted-foreground max-w-2xl mx-auto">
+            Find security vulnerabilities before attackers do.
           </motion.p>
           
-          <motion.div variants={itemVariants} className="mt-10 flex items-center justify-center gap-x-6">
+          <motion.div variants={itemVariants} className="mt-10 flex items-center justify-center gap-x-4">
             <Link to="/register">
-              <Button size="lg" className="rounded-full h-12 px-8 text-base shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:-translate-y-1">
+              <Button size="lg" className="rounded-full h-12 px-8">
                 Get Started
-                <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
-            <Link to="/login" className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors hover:translate-x-1 duration-300 flex items-center gap-2">
-              Log in <span aria-hidden="true">→</span>
-            </Link>
-          </motion.div>
-        </motion.div>
-
-        {/* Feature grid */}
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true }}
-          className="mt-32 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          <motion.div variants={itemVariants} className="glass-panel p-8 hover:-translate-y-2 transition-transform duration-300 group">
-            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <Network className="w-6 h-6 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-3 text-foreground group-hover:text-primary transition-colors">16-Layer Analysis</h3>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Synthesizing AST, CFG, PDG, and Call Graphs. Our hybrid model captures both structural and semantic vulnerability markers.
-            </p>
+            <Button size="lg" variant="outline" className="rounded-full h-12 px-8">
+              Watch Demo
+              <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="glass-panel p-8 hover:-translate-y-2 transition-transform duration-300 group">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <Crosshair className="w-6 h-6 text-amber-500" />
+          {/* Workflow Animation Text */}
+          <motion.div variants={itemVariants} className="mt-24 max-w-sm mx-auto space-y-4">
+            <div className="bg-card border border-border rounded-card p-4 text-center font-medium shadow-soft">
+              Upload Code
             </div>
-            <h3 className="text-xl font-semibold mb-3 text-foreground group-hover:text-amber-500 transition-colors">AI Explainability</h3>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Don't just detect vulnerabilities. Understand exactly why a node was flagged using state-of-the-art SHAP analysis and heatmaps.
-            </p>
-          </motion.div>
-
-          <motion.div variants={itemVariants} className="glass-panel p-8 hover:-translate-y-2 transition-transform duration-300 group">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <GitBranch className="w-6 h-6 text-emerald-500" />
+            <div className="flex justify-center text-primary">
+              <ArrowDown className="w-6 h-6 animate-bounce" />
             </div>
-            <h3 className="text-xl font-semibold mb-3 text-foreground group-hover:text-emerald-500 transition-colors">Taint Flow Tracking</h3>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Tracing attack paths from user inputs to critical sinks to identify SQL injections, Buffer Overflows and XSS automatically.
-            </p>
+            <div className="bg-card border border-border rounded-card p-4 text-center font-medium shadow-soft">
+              AI Analysis
+            </div>
+            <div className="flex justify-center text-primary">
+              <ArrowDown className="w-6 h-6 animate-bounce" />
+            </div>
+            <div className="bg-card border border-border rounded-card p-4 text-center font-medium shadow-soft">
+              LLM Fix
+            </div>
+            <div className="flex justify-center text-primary">
+              <ArrowDown className="w-6 h-6 animate-bounce" />
+            </div>
+            <div className="bg-card border border-border rounded-card p-4 text-center font-medium shadow-soft">
+              Report
+            </div>
           </motion.div>
         </motion.div>
       </div>
 
-      {/* Statistics banner */}
-      <div className="border-y border-border/50 bg-card/20 backdrop-blur-sm py-12 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10 flex flex-wrap gap-8 justify-around items-center">
-          <div className="text-center">
-            <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-white to-white/70">10M+</div>
-            <div className="text-sm font-medium text-muted-foreground mt-2 uppercase tracking-widest">Lines Scanned</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-white to-white/70">C/C++</div>
-            <div className="text-sm font-medium text-muted-foreground mt-2 uppercase tracking-widest">Languages</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-white to-white/70">99.3%</div>
-            <div className="text-sm font-medium text-muted-foreground mt-2 uppercase tracking-widest">Detection Rate</div>
-          </div>
-        </div>
-      </div>
-      
-      <footer className="text-center py-8 text-sm text-muted-foreground/60">
+      <footer className="text-center py-8 text-sm text-muted-foreground border-t border-border">
         © {new Date().getFullYear()} Aegis Kinetic. All rights reserved.
       </footer>
     </div>

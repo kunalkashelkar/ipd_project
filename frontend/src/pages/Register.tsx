@@ -29,16 +29,15 @@ export default function Register() {
       >
         <div className="text-center mb-8">
           <Link to="/" className="inline-block group space-y-4">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-cyan-400 to-primary flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-8 h-8 text-white" />
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-primary flex items-center justify-center shadow-soft group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-8 h-8 text-primary-foreground" />
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Aegis Kinetic</h1>
           </Link>
           <p className="mt-2 text-sm text-muted-foreground">Request access for your organization</p>
         </div>
 
-        <div className="glass-panel p-8 sm:p-10 border border-border/80 shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+        <div className="bg-card rounded-card p-8 sm:p-10 border border-border shadow-soft relative overflow-hidden">
           
           <form onSubmit={handleRegister} className="space-y-5 relative z-10">
             <div className="space-y-2">

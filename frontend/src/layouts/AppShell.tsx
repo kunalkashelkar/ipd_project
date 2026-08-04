@@ -35,10 +35,7 @@ export function PublicLayout() {
   const location = useLocation();
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/3" />
-      
+
       <main className="flex-1 flex flex-col relative z-10">
         <AnimatePresence mode="wait">
           <motion.div
