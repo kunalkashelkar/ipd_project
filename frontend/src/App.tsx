@@ -9,8 +9,15 @@ const Dashboard   = lazy(() => import('./pages/Dashboard'));
 const ProjectsList = lazy(() => import('./pages/projects/ProjectsList'));
 const CreateProject = lazy(() => import('./pages/projects/CreateProject'));
 const ProjectDetail = lazy(() => import('./pages/projects/ProjectDetail'));
+const ScanConfig = lazy(() => import('./pages/projects/ScanConfig'));
+const ScanProgress = lazy(() => import('./pages/projects/ScanProgress'));
+const ScanResultsWorkspace = lazy(() => import('./pages/projects/ScanResultsWorkspace'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 const Upload      = lazy(() => import('./pages/Upload')); 
-const Analysis    = lazy(() => import('./pages/Analysis'));  
+const AnalysisLegacy = lazy(() => import('./pages/Analysis'));  
 const GraphViewer = lazy(() => import('./pages/GraphViewer'));
 const TaintReport = lazy(() => import('./pages/TaintReport'));
 const Landing     = lazy(() => import('./pages/Landing'));
@@ -65,17 +72,20 @@ function App() {
             <Route path="/projects" element={<ProjectsList />} />
             <Route path="/projects/create" element={<CreateProject />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
+            <Route path="/projects/:id/scan-config" element={<ScanConfig />} />
+            <Route path="/projects/:id/scan-progress" element={<ScanProgress />} />
+            <Route path="/projects/:id/results" element={<ScanResultsWorkspace />} />
             
-            <Route path="/scans" element={<Placeholder title="Scans" />} />
-            <Route path="/reports" element={<Placeholder title="Reports" />} />
-            <Route path="/analytics" element={<Placeholder title="Analytics" />} />
-            <Route path="/notifications" element={<Placeholder title="Notifications" />} />
+            <Route path="/scans" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/docs" element={<Placeholder title="Documentation" />} />
-            <Route path="/settings" element={<Placeholder title="Settings" />} />
+            <Route path="/settings" element={<Settings />} />
 
             {/* Legacy/Utility routes */}
             <Route path="/upload" element={<Upload />} />
-            <Route path="/analysis/:jobId" element={<Analysis />} />
+            <Route path="/analysis/:jobId" element={<AnalysisLegacy />} />
             <Route path="/graph/:jobId" element={<GraphViewer />} />
             <Route path="/taint/:taintJobId" element={<TaintReport />} />
             <Route path="/graph/taint/:taintJobId" element={<GraphViewer taintMode />} />

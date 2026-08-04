@@ -135,7 +135,7 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
     return [...nodes, ...edges];
   }, [data, layer]);
 
-  const stylesheet: cytoscape.Stylesheet[] = [
+  const stylesheet: cytoscape.StylesheetStyle[] = [
     {
       selector: 'node',
       style: {
@@ -240,7 +240,7 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
             <CytoscapeComponent
               elements={elements}
               stylesheet={stylesheet}
-              layout={{ name: 'dagre', rankDir: 'TB', nodeSep: 40, rankSep: 70 } as unknown}
+              layout={{ name: 'dagre', rankDir: 'TB', nodeSep: 40, rankSep: 70 } as cytoscape.LayoutOptions}
               style={{ width: '100%', height: '100%' }}
               cy={cy => {
                 cyRef.current = cy;
