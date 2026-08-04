@@ -10,11 +10,11 @@ import { getTaintStatus, getTaintReport, TaintStatusResponse, TaintReportRespons
 const POLL_MS = 3000;
 
 const SEVERITY_CONFIG: Record<string, { color: string; bg: string; border: string; icon: React.ReactNode }> = {
-  CRITICAL: { color: 'text-red-700',    bg: 'bg-red-50',    border: 'border-red-200',    icon: <FiAlertCircle className="w-4 h-4" /> },
-  HIGH:     { color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: <FiAlertTriangle className="w-4 h-4" /> },
-  MEDIUM:   { color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-200', icon: <FiAlertTriangle className="w-4 h-4" /> },
-  LOW:      { color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',   icon: <FiShield className="w-4 h-4" /> },
-  SAFE:     { color: 'text-emerald-700',bg: 'bg-emerald-50',border: 'border-emerald-200',icon: <FiCheckCircle className="w-4 h-4" /> },
+  CRITICAL: { color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200', icon: <FiAlertCircle className="w-4 h-4" /> },
+  HIGH: { color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: <FiAlertTriangle className="w-4 h-4" /> },
+  MEDIUM: { color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-200', icon: <FiAlertTriangle className="w-4 h-4" /> },
+  LOW: { color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', icon: <FiShield className="w-4 h-4" /> },
+  SAFE: { color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', icon: <FiCheckCircle className="w-4 h-4" /> },
 };
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -72,9 +72,9 @@ function PathRow({ path, expanded, onToggle }: { path: AttackPath; expanded: boo
                 <span className={clsx(
                   'px-2 py-1 rounded font-mono',
                   n === path.source_node_id ? 'bg-green-100 text-green-800' :
-                  n === path.sink_node_id   ? 'bg-red-100 text-red-800' :
-                  path.sanitized && path.nodes.indexOf(n) > 0 ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-surface-100 text-surface-600',
+                    n === path.sink_node_id ? 'bg-red-100 text-red-800' :
+                      path.sanitized && path.nodes.indexOf(n) > 0 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-surface-100 text-surface-600',
                 )}>
                   {n.length > 8 ? n.slice(0, 8) + '…' : n}
                 </span>
@@ -90,10 +90,10 @@ function PathRow({ path, expanded, onToggle }: { path: AttackPath; expanded: boo
 
 export default function TaintReport() {
   const { taintJobId } = useParams<{ taintJobId: string }>();
-  const [status, setStatus]   = useState<TaintStatusResponse | null>(null);
-  const [report, setReport]   = useState<TaintReportResponse | null>(null);
+  const [status, setStatus] = useState<TaintStatusResponse | null>(null);
+  const [report, setReport] = useState<TaintReportResponse | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!taintJobId) return;
@@ -150,10 +150,10 @@ export default function TaintReport() {
       {/* Summary stats */}
       {status && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          <StatCard label="Sources"      value={status.source_count}       color="text-primary-600" />
-          <StatCard label="Sinks"        value={status.sink_count}         color="text-red-600" />
-          <StatCard label="Tainted Nodes"value={status.tainted_node_count} color="text-yellow-600" />
-          <StatCard label="Attack Paths" value={status.attack_path_count}  color="text-purple-600" />
+          <StatCard label="Sources" value={status.source_count} color="text-primary-600" />
+          <StatCard label="Sinks" value={status.sink_count} color="text-red-600" />
+          <StatCard label="Tainted Nodes" value={status.tainted_node_count} color="text-yellow-600" />
+          <StatCard label="Attack Paths" value={status.attack_path_count} color="text-purple-600" />
         </div>
       )}
 
@@ -161,9 +161,9 @@ export default function TaintReport() {
       {status && status.status === 'completed' && (
         <div className="grid grid-cols-4 gap-3 mb-8 animate-fade-in">
           <StatCard label="Critical" value={status.critical_path_count} color="text-red-700" />
-          <StatCard label="High"     value={status.high_path_count}     color="text-orange-600" />
-          <StatCard label="Medium"   value={status.medium_path_count}   color="text-yellow-600" />
-          <StatCard label="Low"      value={status.low_path_count}      color="text-blue-600" />
+          <StatCard label="High" value={status.high_path_count} color="text-orange-600" />
+          <StatCard label="Medium" value={status.medium_path_count} color="text-yellow-600" />
+          <StatCard label="Low" value={status.low_path_count} color="text-blue-600" />
         </div>
       )}
 

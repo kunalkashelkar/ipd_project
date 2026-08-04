@@ -13,16 +13,16 @@ cytoscape.use(dagre);
 type Layer = 'ALL' | 'AST' | 'CFG' | 'DFG' | 'TAINT';
 
 const LAYER_COLORS: Record<string, string> = {
-  METHOD:            '#6366f1',
-  CALL:              '#8b5cf6',
-  IDENTIFIER:        '#06b6d4',
-  LITERAL:           '#10b981',
+  METHOD: '#6366f1',
+  CALL: '#8b5cf6',
+  IDENTIFIER: '#06b6d4',
+  LITERAL: '#10b981',
   CONTROL_STRUCTURE: '#f59e0b',
-  RETURN:            '#f43f5e',
-  PARAM:             '#64748b',
-  BLOCK:             '#94a3b8',
-  LOCAL:             '#a78bfa',
-  UNKNOWN:           '#cbd5e1',
+  RETURN: '#f43f5e',
+  PARAM: '#64748b',
+  BLOCK: '#94a3b8',
+  LOCAL: '#a78bfa',
+  UNKNOWN: '#cbd5e1',
 };
 
 const EDGE_COLORS: Record<string, string> = {
@@ -47,14 +47,14 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
   useEffect(() => {
     const id = taintMode ? taintJobId : jobId;
     if (!id) return;
-    
+
     const fetcher = taintMode ? getTaintGraph : getGraph;
 
     fetcher(id)
       .then(setData)
       .catch((err) => {
-          console.error(err);
-          setError('Graph not available. Ensure the job has completed.');
+        console.error(err);
+        setError('Graph not available. Ensure the job has completed.');
       })
       .finally(() => setLoading(false));
   }, [jobId, taintJobId, taintMode]);
@@ -259,11 +259,11 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
           {selected && (
             <div className="w-80 rounded-xl border border-surface-200 bg-white p-5 animate-slide-up shrink-0 shadow-lg flex flex-col">
               <h3 className="font-bold text-surface-900 mb-4 border-b pb-2">Node Inspector</h3>
-              
+
               <div className="space-y-3 text-sm flex-1 overflow-y-auto">
                 <div><span className="text-surface-400 font-medium block">ID</span><span className="font-mono text-xs text-surface-700 break-all">{selected.id}</span></div>
                 <div><span className="text-surface-400 font-medium block">Type</span><span className="font-bold px-2 py-0.5 rounded text-xs text-white" style={{ backgroundColor: nodeColor(selected.nodeLabel) }}>{selected.nodeLabel}</span></div>
-                
+
                 {selected.code && (
                   <div>
                     <span className="text-surface-400 font-medium block mb-1">Code snippet</span>
@@ -272,7 +272,7 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
                     </div>
                   </div>
                 )}
-                
+
                 <div className="grid grid-cols-2 gap-2">
                   {selected.lineNumber && <div><span className="text-surface-400 font-medium block">Line</span><span>{selected.lineNumber}</span></div>}
                   {selected.filename && <div><span className="text-surface-400 font-medium block">File</span><span className="text-xs truncate" title={selected.filename}>{selected.filename.split('/').pop()}</span></div>}
@@ -282,7 +282,7 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
                 {taintMode && (
                   <div className="mt-4 pt-4 border-t border-surface-100 space-y-2">
                     <h4 className="font-semibold text-primary-900 flex items-center gap-1"><FiShield /> Security Attributes</h4>
-                    
+
                     {selected.is_source && (
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -290,7 +290,7 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
                         <span className="text-xs text-surface-500">({selected.source_category})</span>
                       </div>
                     )}
-                    
+
                     {selected.is_sink && (
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -298,14 +298,14 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
                         <span className="text-xs text-surface-500">({selected.sink_category})</span>
                       </div>
                     )}
-                    
+
                     {!selected.is_sink && selected.is_tainted && (
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
                         <span className="font-medium text-yellow-700 text-xs uppercase">Tainted Node</span>
                       </div>
                     )}
-                    
+
                     {selected.is_sanitized && (
                       <div className="flex items-center gap-2 mt-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -337,7 +337,7 @@ export default function GraphViewer({ taintMode = false }: { taintMode?: boolean
               </span>
             ))}
           </div>
-          
+
           {taintMode && (
             <div className="flex gap-4 flex-wrap text-sm text-surface-600 font-medium border-l pl-4">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border-2 border-green-500"></span> Source</span>

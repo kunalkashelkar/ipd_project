@@ -34,12 +34,12 @@ export default function ProjectDetail() {
             <Badge variant="outline" className="text-muted-foreground">{project.visibility}</Badge>
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-3">
-            <span className="flex items-center gap-1.5"><FileCode2 className="w-4 h-4"/> {project.lang}</span>
-            <span className="flex items-center gap-1.5"><Layers className="w-4 h-4"/> {project.framework}</span>
-            <span className="flex items-center gap-1.5 text-emerald-500"><CheckCircle2 className="w-4 h-4"/> {project.status}</span>
+            <span className="flex items-center gap-1.5"><FileCode2 className="w-4 h-4" /> {project.lang}</span>
+            <span className="flex items-center gap-1.5"><Layers className="w-4 h-4" /> {project.framework}</span>
+            <span className="flex items-center gap-1.5 text-emerald-500"><CheckCircle2 className="w-4 h-4" /> {project.status}</span>
           </div>
         </div>
-        
+
         <div className="flex gap-3">
           <Link to={`/projects/${project.id}/scan-config`}>
             <Button>
@@ -56,11 +56,10 @@ export default function ProjectDetail() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-3 text-sm font-medium transition-colors capitalize ${
-                activeTab === tab 
-                ? 'border-b-2 border-primary text-foreground' 
-                : 'text-muted-foreground hover:text-foreground border-transparent'
-              }`}
+              className={`pb-3 text-sm font-medium transition-colors capitalize ${activeTab === tab
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground border-transparent'
+                }`}
             >
               {tab}
             </button>
@@ -81,7 +80,7 @@ export default function ProjectDetail() {
                 <div className="text-2xl font-bold">{project.files}</div>
               </CardContent>
             </Card>
-            
+
             <Card className="hover:border-primary/50 transition-colors">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between space-y-0 pb-2">

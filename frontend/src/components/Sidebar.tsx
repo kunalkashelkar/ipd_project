@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  FolderOpen, 
-  Activity, 
-  FileText, 
-  BarChart, 
-  Bell, 
-  Settings, 
+import {
+  LayoutDashboard,
+  FolderOpen,
+  Activity,
+  FileText,
+  BarChart,
+  Bell,
+  Settings,
   LogOut,
   ShieldAlert
 } from 'lucide-react';
@@ -49,8 +49,8 @@ export function Sidebar() {
               to={item.to}
               className={({ isActive }) => cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative",
-                isActive 
-                  ? "bg-primary/10 text-primary" 
+                isActive
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
@@ -71,16 +71,16 @@ export function Sidebar() {
 
       <div className="p-4 mt-auto border-t border-border/50">
         <NavLink
-            to="/settings"
-            className={({ isActive }) => cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
-              isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
-            )}
-          >
-            <Settings className="w-5 h-5" />
-            Settings
+          to="/settings"
+          className={({ isActive }) => cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
+            isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+          )}
+        >
+          <Settings className="w-5 h-5" />
+          Settings
         </NavLink>
-        <button 
+        <button
           onClick={handleLogout}
           className="w-full mt-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
         >

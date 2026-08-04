@@ -9,15 +9,21 @@
     @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 min-h-screen text-[14px];
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-display text-foreground;
   }
 }
 
 @layer components {
+
   /* Minimalist standardized components */
   .btn-primary {
-    @apply px-4 py-2 bg-primary text-primary-foreground rounded-btn shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:bg-opacity-90 transition-all duration-200 font-medium whitespace-nowrap;
+    @apply px-4 py-2 bg-primary text-primary-foreground rounded-btn shadow-sm hover:bg-opacity-90 transition-all duration-200 font-medium whitespace-nowrap;
   }
 
   .interactive-card {

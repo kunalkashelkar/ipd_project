@@ -46,7 +46,7 @@ export default function Analytics() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex justify-between items-start">

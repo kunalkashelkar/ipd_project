@@ -52,15 +52,15 @@ export default function ScanProgress() {
       </div>
 
       <Card className="w-full p-8 relative overflow-hidden bg-card/50">
-        
+
         {/* Progress bar background */}
         <div className="absolute top-0 left-0 h-1 bg-muted w-full">
-           <motion.div 
-             className="h-full bg-primary"
-             initial={{ width: 0 }}
-             animate={{ width: `${progressPercentage}%` }}
-             transition={{ duration: 0.5, ease: "easeInOut" }}
-           />
+          <motion.div
+            className="h-full bg-primary"
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercentage}%` }}
+            transition={{ duration: 0.5, ease: "easeInOut" }}
+          />
         </div>
 
         <div className="space-y-6 mt-4">
@@ -70,15 +70,15 @@ export default function ScanProgress() {
             const isPending = index > currentStepIndex;
 
             return (
-              <div 
-                key={step.id} 
+              <div
+                key={step.id}
                 className={`flex items-center gap-4 transition-all duration-500 ${isPending ? 'opacity-40' : 'opacity-100'} ${isCurrent ? 'scale-105' : 'scale-100'}`}
               >
                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors
-                  ${isCompleted ? 'bg-emerald-500/20 text-emerald-500' : 
-                    isCurrent ? 'bg-primary/20 text-primary ring-2 ring-primary ring-offset-2 ring-offset-background' : 
-                    'bg-muted text-muted-foreground'}
+                  ${isCompleted ? 'bg-emerald-500/20 text-emerald-500' :
+                    isCurrent ? 'bg-primary/20 text-primary ring-2 ring-primary ring-offset-2 ring-offset-background' :
+                      'bg-muted text-muted-foreground'}
                 `}>
                   {isCompleted ? (
                     <Check className="w-5 h-5" />
@@ -88,14 +88,14 @@ export default function ScanProgress() {
                     <step.icon className="w-5 h-5" />
                   )}
                 </div>
-                
+
                 <div className="flex-1">
                   <h3 className={`font-medium ${isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {step.label}
                   </h3>
                   <AnimatePresence>
                     {isCurrent && (
-                      <motion.p 
+                      <motion.p
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
@@ -114,9 +114,9 @@ export default function ScanProgress() {
           })}
         </div>
       </Card>
-      
+
       {completed && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mt-8 text-emerald-500 flex items-center gap-2 font-medium"

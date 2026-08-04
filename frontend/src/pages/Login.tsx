@@ -15,7 +15,7 @@ export default function Login() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     // Mock authentication
     setTimeout(() => {
       login(
@@ -29,7 +29,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 relative isolate bg-background">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.4 }}
@@ -46,7 +46,7 @@ export default function Login() {
         </div>
 
         <div className="bg-card rounded-card p-8 sm:p-10 border border-border shadow-soft relative overflow-hidden">
-          
+
           <form onSubmit={handleLogin} className="space-y-6 relative z-10">
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Work Email</label>
@@ -87,9 +87,9 @@ export default function Login() {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-11 relative overflow-hidden group" 
+            <Button
+              type="submit"
+              className="w-full h-11 relative overflow-hidden group"
               disabled={isLoading}
             >
               {isLoading ? (

@@ -5,7 +5,7 @@ import { ShieldAlert } from 'lucide-react';
 import { AppShell, PublicLayout } from './layouts/AppShell';
 
 // Lazy-loaded pages
-const Dashboard   = lazy(() => import('./pages/Dashboard'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProjectsList = lazy(() => import('./pages/projects/ProjectsList'));
 const CreateProject = lazy(() => import('./pages/projects/CreateProject'));
 const ProjectDetail = lazy(() => import('./pages/projects/ProjectDetail'));
@@ -17,13 +17,13 @@ const Analytics = lazy(() => import('./pages/Analytics'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Notifications = lazy(() => import('./pages/Notifications'));
-const Upload      = lazy(() => import('./pages/Upload')); 
-const AnalysisLegacy = lazy(() => import('./pages/Analysis'));  
+const Upload = lazy(() => import('./pages/Upload'));
+const AnalysisLegacy = lazy(() => import('./pages/Analysis'));
 const GraphViewer = lazy(() => import('./pages/GraphViewer'));
 const TaintReport = lazy(() => import('./pages/TaintReport'));
-const Landing     = lazy(() => import('./pages/Landing'));
-const Login       = lazy(() => import('./pages/Login'));
-const Register    = lazy(() => import('./pages/Register'));
+const Landing = lazy(() => import('./pages/Landing'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
 
 // Placeholder components
 const Placeholder = ({ title }: { title: string }) => (
@@ -46,16 +46,16 @@ function Spinner() {
 function App() {
   return (
     <BrowserRouter>
-      <Toaster 
-        position="top-right" 
-        toastOptions={{ 
+      <Toaster
+        position="top-right"
+        toastOptions={{
           duration: 4000,
           style: {
             background: 'hsl(var(--card))',
             color: 'hsl(var(--foreground))',
             border: '1px solid hsl(var(--border))',
           }
-        }} 
+        }}
       />
       <Suspense fallback={<div className="h-screen w-screen bg-background flex items-center justify-center"><Spinner /></div>}>
         <Routes>
@@ -69,7 +69,7 @@ function App() {
           {/* Authenticated routes */}
           <Route element={<AppShell />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            
+
             <Route path="/projects" element={<ProjectsList />} />
             <Route path="/projects/create" element={<CreateProject />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
@@ -77,7 +77,7 @@ function App() {
             <Route path="/projects/:id/scan-config" element={<ScanConfig />} />
             <Route path="/projects/:id/scan-progress" element={<ScanProgress />} />
             <Route path="/projects/:id/results" element={<ScanResultsWorkspace />} />
-            
+
             <Route path="/scans" element={<Navigate to="/dashboard" replace />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/analytics" element={<Analytics />} />
@@ -91,7 +91,7 @@ function App() {
             <Route path="/graph/:jobId" element={<GraphViewer />} />
             <Route path="/taint/:taintJobId" element={<TaintReport />} />
             <Route path="/graph/taint/:taintJobId" element={<GraphViewer taintMode />} />
-            
+
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>

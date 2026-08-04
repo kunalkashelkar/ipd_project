@@ -20,9 +20,9 @@ export default function Reports() {
         <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input 
-              type="text" 
-              placeholder="Search reports..." 
+            <input
+              type="text"
+              placeholder="Search reports..."
               className="w-full bg-background border border-border rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>

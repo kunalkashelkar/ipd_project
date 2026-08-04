@@ -45,7 +45,7 @@ export default function Landing() {
 
       {/* Hero Section */}
       <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32 lg:px-8 flex-1 flex flex-col items-center justify-center">
-        <motion.div 
+        <motion.div
           className="text-center w-full"
           variants={containerVariants}
           initial="hidden"
@@ -54,11 +54,11 @@ export default function Landing() {
           <motion.h1 variants={itemVariants} className="text-5xl font-bold tracking-tight text-foreground sm:text-7xl mb-6">
             AI Powered <span className="text-primary">Vulnerability</span> Detection
           </motion.h1>
-          
+
           <motion.p variants={itemVariants} className="mt-4 text-xl leading-8 text-muted-foreground max-w-2xl mx-auto">
             Find security vulnerabilities before attackers do.
           </motion.p>
-          
+
           <motion.div variants={itemVariants} className="mt-10 flex items-center justify-center gap-x-4">
             <Link to="/register">
               <Button size="lg" className="rounded-full h-12 px-8">

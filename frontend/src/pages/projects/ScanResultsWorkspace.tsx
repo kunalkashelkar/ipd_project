@@ -23,7 +23,7 @@ export default function ScanResultsWorkspace() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] -mt-4 bg-background border border-border rounded-card overflow-hidden relative shadow-soft">
-      
+
       {/* Left Panel: Vulnerability List */}
       <div className={`flex-shrink-0 w-full lg:w-[400px] border-r border-border bg-card flex flex-col transition-all ${selectedVuln ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-4 border-b border-border bg-card sticky top-0 z-10 flex items-center justify-between">
@@ -38,13 +38,13 @@ export default function ScanResultsWorkspace() {
           </div>
           <Badge variant="destructive">4 Issues</Badge>
         </div>
-        
+
         <div className="p-3 border-b border-border bg-card">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input 
-              type="text" 
-              placeholder="Filter vulnerabilities..." 
+            <input
+              type="text"
+              placeholder="Filter vulnerabilities..."
               className="w-full bg-background border border-border rounded-input pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
             />
           </div>
@@ -52,7 +52,7 @@ export default function ScanResultsWorkspace() {
 
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border">
           {MOCK_VULNS.map((vuln) => (
-            <div 
+            <div
               key={vuln.id}
               onClick={() => setSelectedVuln(vuln)}
               className={`p-4 border-b border-border/50 cursor-pointer transition-colors ${selectedVuln?.id === vuln.id ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted/50'}`}
@@ -63,7 +63,7 @@ export default function ScanResultsWorkspace() {
                   {vuln.severity}
                 </Badge>
               </div>
-              
+
               <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-2">
                 <span className="flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5" /> {vuln.file}:{vuln.line}
@@ -89,7 +89,7 @@ export default function ScanResultsWorkspace() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col overflow-hidden relative">
-            
+
             {/* Detail Header */}
             <header className="p-6 border-b border-border bg-card flex items-start justify-between">
               <div className="flex items-center gap-4 lg:hidden mb-4">

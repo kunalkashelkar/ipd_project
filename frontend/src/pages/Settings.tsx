@@ -12,7 +12,7 @@ export default function Settings() {
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
-        
+
         {/* Settings Navigation */}
         <div className="w-full md:w-64 space-y-1">
           {[
@@ -46,7 +46,7 @@ export default function Settings() {
                 <label className="text-sm font-medium">Email Address</label>
                 <input type="email" defaultValue="admin@hybridxai.local" className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
               </div>
-              
+
               <div className="pt-4 border-t border-border flex justify-end">
                 <Button>
                   <Save className="w-4 h-4 mr-2" /> Save Changes
@@ -54,7 +54,7 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle className="text-destructive">Danger Zone</CardTitle>
