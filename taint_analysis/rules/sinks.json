@@ -1,0 +1,46 @@
+{
+  "_comment": "Dangerous C/C++ API sinks by vulnerability category",
+  "buffer_overflow": [
+    "strcpy", "strcat", "sprintf",
+    "gets", "memcpy", "memmove", "bcopy",
+    "strncpy", "strncat", "snprintf",
+    "stpcpy", "stpncpy",
+    "wmemcpy", "wcscpy", "wcscat",
+    "read", "fread"
+  ],
+  "command_injection": [
+    "system", "popen",
+    "execl", "execle", "execlp",
+    "execv", "execve", "execvp", "execvpe",
+    "execveat", "fexecve",
+    "posix_spawn", "wordexp",
+    "ShellExecute", "CreateProcess",
+    "sh", "bash", "cmd"
+  ],
+  "format_string": [
+    "printf", "fprintf", "sprintf", "snprintf",
+    "vprintf", "vfprintf", "vsprintf", "vsnprintf",
+    "syslog", "err", "errx", "warn", "warnx"
+  ],
+  "path_traversal": [
+    "fopen", "open", "freopen", "creat",
+    "access", "stat", "lstat", "fstat",
+    "mkdir", "rmdir", "unlink", "remove",
+    "rename", "chmod", "chown",
+    "opendir", "readdir"
+  ],
+  "sql_injection": [
+    "mysql_query", "mysql_real_query",
+    "sqlite3_exec", "sqlite3_prepare",
+    "PQexec", "PQexecParams",
+    "OCIStmtPrepare", "SQLExecDirect"
+  ],
+  "heap_overflow": [
+    "malloc", "realloc", "calloc",
+    "HeapAlloc", "LocalAlloc", "GlobalAlloc"
+  ],
+  "integer_overflow": [
+    "atoi", "atol", "atoll",
+    "strtol", "strtoul", "strtoll", "strtoull"
+  ]
+}

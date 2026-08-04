@@ -1,0 +1,20 @@
+{
+  "vertices": [
+    {"id": "1", "label": "METHOD",     "properties": {"NAME": [{"value": "main"}],         "LINE_NUMBER": [{"value": 1}]}},
+    {"id": "2", "label": "PARAM",      "properties": {"NAME": [{"value": "argc"}],         "LINE_NUMBER": [{"value": 1}]}},
+    {"id": "3", "label": "BLOCK",      "properties": {"CODE":  [{"value": "{ ... }"}],     "LINE_NUMBER": [{"value": 2}]}},
+    {"id": "4", "label": "CALL",       "properties": {"NAME":  [{"value": "vulnerable_copy"}], "LINE_NUMBER": [{"value": 4}]}},
+    {"id": "5", "label": "IDENTIFIER", "properties": {"NAME":  [{"value": "argc"}],        "LINE_NUMBER": [{"value": 3}]}},
+    {"id": "6", "label": "RETURN",     "properties": {"CODE":  [{"value": "return 0"}],    "LINE_NUMBER": [{"value": 6}]}}
+  ],
+  "edges": [
+    {"id": "e1", "label": "AST",          "outV": "1", "inV": "2"},
+    {"id": "e2", "label": "AST",          "outV": "1", "inV": "3"},
+    {"id": "e3", "label": "AST",          "outV": "3", "inV": "4"},
+    {"id": "e4", "label": "AST",          "outV": "3", "inV": "6"},
+    {"id": "e5", "label": "CFG",          "outV": "1", "inV": "5"},
+    {"id": "e6", "label": "CFG",          "outV": "5", "inV": "4"},
+    {"id": "e7", "label": "CFG",          "outV": "4", "inV": "6"},
+    {"id": "e8", "label": "REACHING_DEF", "outV": "2", "inV": "5", "properties": {"variable": "argc"}}
+  ]
+}

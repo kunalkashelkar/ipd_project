@@ -1,0 +1,26 @@
+{
+  "nodes": [
+    {"id": "1", "label": "METHOD", "name": "vulnerable_function", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false},
+    {"id": "2", "label": "CALL", "name": "getenv", "CODE": "getenv(\"ADD\")", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 13},
+    {"id": "3", "label": "IDENTIFIER", "name": "data", "CODE": "data", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 13},
+    {"id": "4", "label": "IDENTIFIER", "name": "dest", "CODE": "dest", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 17},
+    {"id": "5", "label": "CALL", "name": "strcat", "CODE": "strcat(dest, data)", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 17},
+    {"id": "6", "label": "CALL", "name": "system", "CODE": "system(dest)", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 18},
+    
+    {"id": "11", "label": "METHOD", "name": "safe_function", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false},
+    {"id": "12", "label": "CALL", "name": "getenv", "CODE": "getenv(\"ADD\")", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 29},
+    {"id": "13", "label": "IDENTIFIER", "name": "data", "CODE": "data", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 29},
+    {"id": "14", "label": "CONTROL_STRUCTURE", "name": "IF", "CODE": "if (strncmp(data, \"safe_cmd\", 8) == 0)", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 33},
+    {"id": "15", "label": "CALL", "name": "system", "CODE": "system(dest)", "is_source": false, "is_sink": false, "is_sanitized": false, "is_tainted": false, "lineNumber": 36}
+  ],
+  "edges": [
+    {"source": "2", "target": "3", "label": "REACHING_DEF"},
+    {"source": "3", "target": "5", "label": "REACHING_DEF"},
+    {"source": "5", "target": "4", "label": "REACHING_DEF"},
+    {"source": "4", "target": "6", "label": "REACHING_DEF"},
+
+    {"source": "12", "target": "13", "label": "REACHING_DEF"},
+    {"source": "13", "target": "14", "label": "REACHING_DEF"},
+    {"source": "14", "target": "15", "label": "REACHING_DEF"}
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "_comment": "User-controlled input sources for C/C++ taint analysis",
+  "functions": [
+    "scanf", "sscanf", "fscanf",
+    "gets", "fgets", "getchar", "getchar_unlocked",
+    "read", "fread", "pread",
+    "recv", "recvfrom", "recvmsg",
+    "readline", "getline", "getdelim",
+    "popen", "fdopen",
+    "read_until", "read_all"
+  ],
+  "env_vars": [
+    "getenv", "secure_getenv",
+    "putenv", "setenv"
+  ],
+  "network": [
+    "recv", "recvfrom", "recvmsg",
+    "accept", "SSL_read", "BIO_read",
+    "http_get", "curl_easy_perform"
+  ],
+  "argv": [
+    "argv", "argc"
+  ],
+  "file_io": [
+    "fread", "read", "pread", "fgets",
+    "fgetc", "fget_s"
+  ],
+  "ipc": [
+    "mq_receive", "msgrcv", "shmget", "shmat",
+    "pipe", "mkfifo"
+  ]
+}

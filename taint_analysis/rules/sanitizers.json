@@ -1,0 +1,34 @@
+{
+  "_comment": "Functions, patterns, and safe APIs that neutralize taint",
+  "functions": [
+    "strncpy", "strncat", "strlcpy", "strlcat",
+    "snprintf", "vsnprintf",
+    "sanitize", "escape", "encode",
+    "validate", "verify", "check_input",
+    "htmlspecialchars", "urlencode",
+    "mysql_real_escape_string", "sqlite3_mprintf",
+    "html_encode", "xml_encode",
+    "strip_tags", "filter_input"
+  ],
+  "safe_format_functions": [
+    "snprintf", "vsnprintf", "strncat"
+  ],
+  "bound_check_patterns": [
+    "if.*len",
+    "if.*size",
+    "if.*strlen",
+    "if.*sizeof",
+    "if.*<.*max",
+    "if.*>.*0",
+    "assert.*len",
+    "assert.*size",
+    "check.*bound",
+    "verify.*length"
+  ],
+  "validation_keywords": [
+    "validate", "verify", "sanitize",
+    "check", "assert", "guard",
+    "bound", "limit", "restrict",
+    "filter", "escape", "clean"
+  ]
+}
