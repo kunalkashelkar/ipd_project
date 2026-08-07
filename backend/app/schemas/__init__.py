@@ -1,63 +1,14 @@
-from backend.app.schemas.schemas import (
-    AttackPathSchema,
-    GraphEdgeSchema,
-    GraphNodeSchema,
-    GraphResponse,
-    HealthResponse,
-    MessageResponse,
-    ParseJobResponse,
-    ParseRequest,
-    ParseStatusResponse,
-    ProjectCreate,
-    ProjectListResponse,
-    ProjectResponse,
-    StatusResponse,
-    TaintJobResponse,
-    TaintReportResponse,
-    TaintRequest,
-    TaintStatusResponse,
-    DatasetRequest,
-    DatasetJobResponse,
-    DatasetStatusResponse,
-    TrainRequest,
-    TrainJobResponse,
-    TrainStatusResponse,
-    PredictRequest,
-    PredictResponse,
-    EmbedRequest,
-    EmbedResponse,
-    UploadListResponse,
-    UploadResponse,
-)
+# ============================================================
+# Schemas Package — re-export all schemas
+# ============================================================
 
-__all__ = [
-    "HealthResponse",
-    "StatusResponse",
-    "ProjectCreate",
-    "ProjectResponse",
-    "ProjectListResponse",
-    "UploadResponse",
-    "UploadListResponse",
-    "MessageResponse",
-    "ParseRequest",
-    "ParseJobResponse",
-    "ParseStatusResponse",
-    "GraphNodeSchema",
-    "GraphEdgeSchema",
-    "GraphResponse",
-    "TaintRequest",
-    "TaintJobResponse",
-    "TaintStatusResponse",
-    "AttackPathSchema",
-    "TaintReportResponse",
-    "DatasetRequest",
-    "DatasetJobResponse",
-    "DatasetStatusResponse",
-    "TrainRequest",
-    "TrainJobResponse",
-    "TrainStatusResponse",
-    "PredictRequest",
-    "PredictResponse",
-    "EmbedRequest",
-    "EmbedResponse",
-]
+from backend.app.schemas.common import *  # noqa: F401, F403
+from backend.app.schemas.auth import *  # noqa: F401, F403
+from backend.app.schemas.user import *  # noqa: F401, F403
+from backend.app.schemas.project import *  # noqa: F401, F403
+from backend.app.schemas.upload import *  # noqa: F401, F403
+from backend.app.schemas.scan import *  # noqa: F401, F403
+from backend.app.schemas.result import *  # noqa: F401, F403
+from backend.app.schemas.report import *  # noqa: F401, F403
+from backend.app.schemas.notification import *  # noqa: F401, F403
+from backend.app.schemas.analytics import *  # noqa: F401, F403

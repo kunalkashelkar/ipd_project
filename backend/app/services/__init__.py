@@ -1,1 +1,1 @@
-# Services package — business logic layer
+# Services package

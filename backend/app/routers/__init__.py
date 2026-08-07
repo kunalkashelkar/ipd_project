@@ -1,10 +1,27 @@
-from backend.app.routers.features import router as features_router
-from backend.app.routers.health import router as health_router
-from backend.app.routers.model import router as model_router
-from backend.app.routers.parser import router as parser_router
-from backend.app.routers.projects import router as projects_router
-from backend.app.routers.semantic import router as semantic_router
-from backend.app.routers.taint import router as taint_router
-from backend.app.routers.upload import router as upload_router
+# ============================================================
+# Routers Package — register all endpoints
+# ============================================================
 
-__all__ = ["health_router", "projects_router", "upload_router", "parser_router", "taint_router", "features_router", "model_router", "semantic_router"]
+from backend.app.routers.auth_router import router as auth_router
+from backend.app.routers.health_router import router as health_router
+from backend.app.routers.project_router import router as project_router
+from backend.app.routers.upload_router import router as upload_router
+from backend.app.routers.scan_router import router as scan_router
+from backend.app.routers.result_router import router as result_router
+from backend.app.routers.report_router import router as report_router
+from backend.app.routers.websocket_router import router as websocket_router
+from backend.app.routers.notification_router import router as notification_router
+from backend.app.routers.analytics_router import router as analytics_router
+
+__all__ = [
+    "auth_router",
+    "health_router",
+    "project_router",
+    "upload_router",
+    "scan_router",
+    "result_router",
+    "report_router",
+    "websocket_router",
+    "notification_router",
+    "analytics_router",
+]
