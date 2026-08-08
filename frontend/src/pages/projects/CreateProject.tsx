@@ -3,17 +3,37 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '../../components/ui/Button';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { projectService } from '../../services/projectService';
+import toast from 'react-hot-toast';
 
 export default function CreateProject() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [language, setLanguage] = useState('java');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setTimeout(() => {
-      navigate('/projects/1/connect');
-    }, 1000);
+
+    try {
+      const project = await projectService.createProject({
+        name,
+        description: description || undefined,
+        language,
+      });
+      toast.success('Project created successfully!');
+      navigate(`/projects/${project.id}`);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        'Failed to create project.';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -35,15 +55,18 @@ export default function CreateProject() {
               <input
                 type="text"
                 required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full h-10 px-3 bg-background border border-border rounded-input text-sm focus:ring-1 focus:ring-primary outline-none"
                 placeholder="Payment Gateway"
-                defaultValue="Payment Gateway"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Description</label>
               <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 className="w-full p-3 bg-background border border-border rounded-input text-sm focus:ring-1 focus:ring-primary outline-none min-h-[100px]"
                 placeholder="Core payment processing microservice..."
               />
@@ -51,7 +74,11 @@ export default function CreateProject() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Primary Language</label>
-              <select className="w-full h-10 px-3 bg-background border border-border rounded-input text-sm focus:ring-1 focus:ring-primary outline-none">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full h-10 px-3 bg-background border border-border rounded-input text-sm focus:ring-1 focus:ring-primary outline-none"
+              >
                 <option value="java">Java</option>
                 <option value="c">C / C++</option>
                 <option value="python">Python</option>
@@ -67,30 +94,6 @@ export default function CreateProject() {
                 placeholder="https://github.com/organization/repo"
               />
               <p className="text-xs text-muted-foreground">Optional at this stage. You can connect it via OAuth in the next step.</p>
-            </div>
-
-            <div className="space-y-3 pt-4 border-t border-border">
-              <label className="text-sm font-medium flex items-center gap-2">Visibility</label>
-              
-              <label className="flex items-start gap-3 p-3 border border-border rounded-card cursor-pointer hover:bg-muted/50 transition-colors">
-                <div className="pt-0.5">
-                  <input type="radio" name="visibility" value="public" className="accent-primary" />
-                </div>
-                <div>
-                  <div className="font-medium text-sm">Public</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Anyone on the internet can see this project. You choose who can scan.</div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 p-3 border border-border rounded-card cursor-pointer bg-primary/5 hover:bg-primary/10 transition-colors">
-                <div className="pt-0.5">
-                  <input type="radio" name="visibility" value="private" className="accent-primary" defaultChecked />
-                </div>
-                <div>
-                  <div className="font-medium text-sm">Private</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">You choose who can see and commit to this project.</div>
-                </div>
-              </label>
             </div>
             
           </CardContent>

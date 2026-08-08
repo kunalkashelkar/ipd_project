@@ -7,7 +7,7 @@ from __future__ import annotations
 from loguru import logger
 
 from backend.app.workers.celery_app import celery_app
-from backend.app.workers.scan_tasks import AsyncCeleryTask
+from backend.app.workers.base_task import AsyncCeleryTask
 from backend.app.workers.notification_tasks import send_notification_task
 
 

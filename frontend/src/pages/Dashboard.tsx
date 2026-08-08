@@ -1,31 +1,80 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Activity, FolderOpen, AlertTriangle, FileText, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Activity, FolderOpen, AlertTriangle, FileText, ArrowRight, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Link } from 'react-router-dom';
-
-const MOCK_STATS = [
-  { title: "Projects", value: "12", icon: FolderOpen, color: "text-blue-500" },
-  { title: "Critical Vulnerabilities", value: "3", icon: AlertTriangle, color: "text-destructive" },
-  { title: "Reports", value: "18", icon: FileText, color: "text-purple-500" },
-  { title: "Risk Score", value: "81%", icon: ShieldCheck, color: "text-emerald-500" },
-];
-
-const RECENT_PROJECTS = [
-  { id: '1', name: 'Payment App', fw: 'Spring Boot', lastScan: 'Yesterday', status: 'Open' },
-  { id: '2', name: 'Bank API', fw: 'Node.js', lastScan: '2 days ago', status: 'Open' },
-  { id: '3', name: 'Shopping Cart', fw: 'React', lastScan: '3 days ago', status: 'Open' },
-];
+import { useAuthStore } from '../store';
+import { analyticsService } from '../services/analyticsService';
+import { projectService } from '../services/projectService';
+import { Project, DashboardMetrics } from '../types';
 
 export default function Dashboard() {
+  const { user } = useAuthStore();
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboard() {
+      setLoading(true);
+      try {
+        const [metricsData, projectsData] = await Promise.allSettled([
+          analyticsService.getDashboardMetrics(),
+          projectService.listProjects({ page: 1, page_size: 5 }),
+        ]);
+
+        if (metricsData.status === 'fulfilled') {
+          setMetrics(metricsData.value);
+        }
+        if (projectsData.status === 'fulfilled') {
+          setProjects(projectsData.value.items);
+        }
+      } catch {
+        // Errors are handled by the API interceptor
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDashboard();
+  }, []);
+
+  const stats = [
+    {
+      title: 'Projects',
+      value: metrics?.total_projects?.toString() ?? '—',
+      icon: FolderOpen,
+      color: 'text-blue-500',
+    },
+    {
+      title: 'Critical Vulnerabilities',
+      value: metrics?.severity_breakdown?.CRITICAL?.toString() ?? metrics?.severity_breakdown?.critical?.toString() ?? '—',
+      icon: AlertTriangle,
+      color: 'text-destructive',
+    },
+    {
+      title: 'Total Scans',
+      value: metrics?.total_scans?.toString() ?? '—',
+      icon: Activity,
+      color: 'text-purple-500',
+    },
+    {
+      title: 'Total Findings',
+      value: metrics?.total_vulnerabilities?.toString() ?? '—',
+      icon: ShieldCheck,
+      color: 'text-emerald-500',
+    },
+  ];
+
+  const firstName = user?.name?.split(' ')[0] || 'User';
+
   return (
     <div className="space-y-8 pb-12 max-w-6xl mx-auto">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            Hello Rahul 👋
+            Hello {firstName} 👋
           </h1>
           <p className="text-muted-foreground mt-1">Here is your security overview.</p>
         </div>
@@ -41,7 +90,7 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {MOCK_STATS.map((stat, i) => (
+        {stats.map((stat, i) => (
           <motion.div
             key={stat.title}
             initial={{ opacity: 0, y: 10 }}
@@ -57,7 +106,11 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <div className="text-3xl font-bold">{stat.value}</div>
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <div className="text-3xl font-bold">{stat.value}</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -73,38 +126,58 @@ export default function Dashboard() {
             <CardDescription>Your integrated repositories</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-background border-y border-border">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Project</th>
-                    <th className="px-6 py-4 font-medium">Framework</th>
-                    <th className="px-6 py-4 font-medium">Last Scan</th>
-                    <th className="px-6 py-4 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {RECENT_PROJECTS.map((project, i) => (
-                    <tr key={project.id} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${i === RECENT_PROJECTS.length - 1 ? 'border-b-0' : ''}`}>
-                      <td className="px-6 py-4 font-medium text-foreground">{project.name}</td>
-                      <td className="px-6 py-4 text-muted-foreground">{project.fw}</td>
-                      <td className="px-6 py-4 text-muted-foreground">{project.lastScan}</td>
-                      <td className="px-6 py-4">
-                        <Link to={`/projects/${project.id}`}>
-                          <Button variant="outline" size="sm">
-                            {project.status}
-                          </Button>
-                        </Link>
-                      </td>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <FolderOpen className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">No projects yet</p>
+                <p className="text-sm mt-1">Create your first project to get started.</p>
+                <Link to="/projects/create">
+                  <Button className="mt-4" variant="outline">
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    Create Project
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-muted-foreground uppercase bg-background border-y border-border">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">Project</th>
+                      <th className="px-6 py-4 font-medium">Language</th>
+                      <th className="px-6 py-4 font-medium">Created</th>
+                      <th className="px-6 py-4 font-medium">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {projects.map((project, i) => (
+                      <tr key={project.id} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${i === projects.length - 1 ? 'border-b-0' : ''}`}>
+                        <td className="px-6 py-4 font-medium text-foreground">{project.name}</td>
+                        <td className="px-6 py-4 text-muted-foreground">{project.language || '—'}</td>
+                        <td className="px-6 py-4 text-muted-foreground">
+                          {new Date(project.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <Link to={`/projects/${project.id}`}>
+                            <Button variant="outline" size="sm">
+                              Open <ArrowRight className="w-3 h-3 ml-1" />
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Charts Mockups */}
+        {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
@@ -119,7 +192,17 @@ export default function Dashboard() {
               <CardTitle className="text-base">Severity Distribution</CardTitle>
             </CardHeader>
             <CardContent className="h-48 flex items-center justify-center text-muted-foreground bg-muted/10 m-6 mt-0 rounded-lg border border-dashed border-border">
-              [Donut Chart Graphic]
+              {metrics?.severity_breakdown ? (
+                <div className="text-center space-y-1">
+                  {Object.entries(metrics.severity_breakdown).map(([k, v]) => (
+                    <div key={k} className="text-xs">
+                      <span className="font-medium uppercase">{k}</span>: {v}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                '[Donut Chart Graphic]'
+              )}
             </CardContent>
           </Card>
           <Card>

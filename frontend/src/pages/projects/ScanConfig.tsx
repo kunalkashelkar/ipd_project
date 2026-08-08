@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Play, Settings2, Shield, X, ScanEye, Zap, FileText } from 'lucide-react';
+import { Play, Settings2, Shield, X, ScanEye, Zap, FileText, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { uploadService } from '../../services/uploadService';
+import { scanService } from '../../services/scanService';
+import { Upload } from '../../types';
+import toast from 'react-hot-toast';
 
 export default function ScanConfig() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const [isStarting, setIsStarting] = useState(false);
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const [selectedUploadId, setSelectedUploadId] = useState<string>('');
+  const [loadingUploads, setLoadingUploads] = useState(true);
 
   const [options, setOptions] = useState({
     static: true,
@@ -18,11 +25,44 @@ export default function ScanConfig() {
     report: true
   });
 
-  const handleStartScan = () => {
+  useEffect(() => {
+    if (!id) return;
+    async function loadUploads() {
+      setLoadingUploads(true);
+      try {
+        const data = await uploadService.listUploads(id!, { page_size: 50 });
+        setUploads(data.items);
+        if (data.items.length > 0) {
+          setSelectedUploadId(data.items[0].id);
+        }
+      } catch {
+        // Handled by interceptor
+      } finally {
+        setLoadingUploads(false);
+      }
+    }
+    loadUploads();
+  }, [id]);
+
+  const handleStartScan = async () => {
+    if (!id || !selectedUploadId) {
+      toast.error('Please select an upload to scan.');
+      return;
+    }
+
     setIsStarting(true);
-    setTimeout(() => {
-      navigate(`/projects/${id}/scan-progress`);
-    }, 800);
+    try {
+      const scan = await scanService.createScan({
+        project_id: id,
+        upload_id: selectedUploadId,
+      });
+      toast.success('Scan started!');
+      navigate(`/projects/${id}/scan-progress?scan_id=${scan.id}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to start scan.');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   return (
@@ -47,10 +87,36 @@ export default function ScanConfig() {
             <CardTitle className="text-2xl flex items-center gap-2">
               <Settings2 className="w-6 h-6 text-primary" /> Choose Analysis
             </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">Configure vulnerability detection parameters for Payment API.</p>
+            <p className="text-sm text-muted-foreground mt-1">Configure vulnerability detection parameters.</p>
           </CardHeader>
           
           <CardContent className="space-y-4">
+            {/* Upload Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Upload to Scan *</label>
+              {loadingUploads ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading uploads...
+                </div>
+              ) : uploads.length === 0 ? (
+                <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
+                  No uploads found. Please upload source code first.
+                </div>
+              ) : (
+                <select
+                  value={selectedUploadId}
+                  onChange={(e) => setSelectedUploadId(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-border rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none"
+                >
+                  {uploads.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.original_filename} ({(u.file_size / 1024).toFixed(1)} KB)
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             <div className="space-y-3">
               {[
                 { id: 'static', label: 'Static Analysis', desc: 'Basic AST pattern matching and linting.', icon: Shield },
@@ -88,7 +154,11 @@ export default function ScanConfig() {
           
           <CardFooter className="bg-muted/20 border-t border-border p-6 flex justify-between mt-2">
             <Button variant="ghost" onClick={() => navigate(-1)}>Cancel</Button>
-            <Button onClick={handleStartScan} disabled={isStarting} className="min-w-[140px]">
+            <Button
+              onClick={handleStartScan}
+              disabled={isStarting || !selectedUploadId}
+              className="min-w-[140px]"
+            >
               {isStarting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

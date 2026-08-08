@@ -2,12 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, Project, Notification } from './types';
 
+// ── Auth Store ────────────────────────────────────────────────
+
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  login: (user: User, token: string) => void;
+  login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
+  setUser: (user: User) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -15,15 +19,21 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
-      login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      login: (user, token, refreshToken) =>
+        set({ user, token, refreshToken, isAuthenticated: true }),
+      logout: () =>
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
+      setUser: (user) => set({ user }),
     }),
     {
       name: 'auth-storage',
     }
   )
 );
+
+// ── Project Store ─────────────────────────────────────────────
 
 interface ProjectState {
   projects: Project[];
@@ -42,6 +52,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
   addProject: (project) => set((state) => ({ projects: [...state.projects, project] })),
   removeProject: (id) => set((state) => ({ projects: state.projects.filter(p => p.id !== id) })),
 }));
+
+// ── Notification Store ────────────────────────────────────────
 
 interface NotificationState {
   notifications: Notification[];
@@ -72,6 +84,8 @@ export const useNotificationStore = create<NotificationState>((set) => ({
     notifications: state.notifications.filter(n => n.id !== id)
   })),
 }));
+
+// ── Theme Store ───────────────────────────────────────────────
 
 interface ThemeState {
   mode: 'light' | 'dark' | 'system';

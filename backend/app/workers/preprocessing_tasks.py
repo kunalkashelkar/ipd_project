@@ -16,7 +16,7 @@ from backend.app.repositories.upload_repository import UploadRepository
 from backend.app.services.preprocessing_service import PreprocessingService
 from backend.app.workers.ai_tasks import run_ai_inference_task
 from backend.app.workers.celery_app import celery_app
-from backend.app.workers.scan_tasks import AsyncCeleryTask
+from backend.app.workers.base_task import AsyncCeleryTask
 
 
 @celery_app.task(bind=True, base=AsyncCeleryTask, name="run_preprocessing")

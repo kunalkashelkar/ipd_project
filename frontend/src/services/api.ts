@@ -1,11 +1,93 @@
-// API client — typed service layer for backend communication
-import axios from 'axios';
+// ============================================================
+// API Client — Axios with JWT Interceptor & Response Unwrapper
+// ============================================================
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import toast from 'react-hot-toast';
 
-const api = axios.create({ baseURL: BASE });
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
-// ── Types ───────────────────────────────────────────────────────
+// ── Create Axios Instance ────────────────────────────────────
+
+const apiClient = axios.create({
+  baseURL: BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// ── Request Interceptor: Attach JWT Token ────────────────────
+
+apiClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    // Read token from persisted Zustand store in localStorage
+    try {
+      const raw = localStorage.getItem('auth-storage');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const token = parsed?.state?.token;
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      }
+    } catch {
+      // Silently ignore parse errors
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ── Response Interceptor: Unwrap Envelope & Handle 401 ───────
+
+apiClient.interceptors.response.use(
+  (response) => {
+    // The backend wraps responses in { status, data, message }
+    // We unwrap so consumers get the inner `data` directly
+    if (response.data && response.data.status === 'success') {
+      response.data = response.data.data;
+    }
+    return response;
+  },
+  (error: AxiosError<{ status: string; message: string; detail?: string }>) => {
+    if (error.response) {
+      const status = error.response.status;
+      const message =
+        error.response.data?.message ||
+        error.response.data?.detail ||
+        'An unexpected error occurred';
+
+      if (status === 401) {
+        // Clear auth state and redirect to login
+        try {
+          localStorage.removeItem('auth-storage');
+        } catch { /* ignore */ }
+        
+        // Only redirect if not already on login/register page
+        if (!window.location.pathname.startsWith('/login') &&
+            !window.location.pathname.startsWith('/register')) {
+          toast.error('Session expired. Please log in again.');
+          window.location.href = '/login';
+        }
+      } else if (status === 403) {
+        toast.error('Access denied: ' + message);
+      } else if (status === 422) {
+        toast.error('Validation error: ' + message);
+      } else if (status >= 500) {
+        toast.error('Server error: ' + message);
+      }
+    } else if (error.request) {
+      toast.error('Network error. Please check your connection.');
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
+
+// ── Legacy API functions (kept for backward compatibility) ────
 
 export interface UploadResponse {
   id: string;
@@ -65,12 +147,11 @@ export interface GraphResponse {
   statistics: Record<string, unknown>;
 }
 
-// ── API calls ───────────────────────────────────────────────────
-
+// Legacy API calls using the new apiClient
 export const uploadFile = async (file: File): Promise<UploadResponse> => {
   const form = new FormData();
   form.append('file', file);
-  const { data } = await api.post<UploadResponse>('/upload', form);
+  const { data } = await apiClient.post<UploadResponse>('/upload', form);
   return data;
 };
 
@@ -78,7 +159,7 @@ export const queueParse = async (
   uploadId: string,
   projectId?: string,
 ): Promise<ParseJobResponse> => {
-  const { data } = await api.post<ParseJobResponse>('/parse', {
+  const { data } = await apiClient.post<ParseJobResponse>('/parse', {
     upload_id: uploadId,
     project_id: projectId ?? null,
   });
@@ -86,17 +167,18 @@ export const queueParse = async (
 };
 
 export const getParseStatus = async (jobId: string): Promise<ParseStatusResponse> => {
-  const { data } = await api.get<ParseStatusResponse>(`/parse/${jobId}`);
+  const { data } = await apiClient.get<ParseStatusResponse>(`/parse/${jobId}`);
   return data;
 };
 
 export const getGraph = async (jobId: string): Promise<GraphResponse> => {
-  const { data } = await api.get<GraphResponse>(`/parse/${jobId}/graph`);
+  const { data } = await apiClient.get<GraphResponse>(`/parse/${jobId}/graph`);
   return data;
 };
 
 export const checkHealth = async () => {
-  const { data } = await api.get('/health');
+  // Health endpoint is outside /api/v1
+  const { data } = await axios.get('/health');
   return data;
 };
 
@@ -154,7 +236,7 @@ export interface TaintReportResponse {
 }
 
 export const analyzeTaint = async (cpgJobId: string, projectId?: string): Promise<TaintJobResponse> => {
-  const { data } = await api.post<TaintJobResponse>('/taint/analyze', {
+  const { data } = await apiClient.post<TaintJobResponse>('/taint/analyze', {
     cpg_job_id: cpgJobId,
     project_id: projectId ?? null,
   });
@@ -162,16 +244,16 @@ export const analyzeTaint = async (cpgJobId: string, projectId?: string): Promis
 };
 
 export const getTaintStatus = async (taintJobId: string): Promise<TaintStatusResponse> => {
-  const { data } = await api.get<TaintStatusResponse>(`/taint/${taintJobId}`);
+  const { data } = await apiClient.get<TaintStatusResponse>(`/taint/${taintJobId}`);
   return data;
 };
 
 export const getTaintReport = async (taintJobId: string): Promise<TaintReportResponse> => {
-  const { data } = await api.get<TaintReportResponse>(`/taint/${taintJobId}/report`);
+  const { data } = await apiClient.get<TaintReportResponse>(`/taint/${taintJobId}/report`);
   return data;
 };
 
 export const getTaintGraph = async (taintJobId: string): Promise<GraphResponse> => {
-  const { data } = await api.get<GraphResponse>(`/taint/${taintJobId}/graph`);
+  const { data } = await apiClient.get<GraphResponse>(`/taint/${taintJobId}/graph`);
   return data;
 };

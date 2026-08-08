@@ -3,20 +3,34 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Mail, Lock, Building, User as UserIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { authService } from '../services/authService';
+import toast from 'react-hot-toast';
 
 export default function Register() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock registration
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await authService.register(name, email, password);
+      toast.success('Account created successfully! Please sign in.');
       navigate('/login');
-    }, 1500);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        'Registration failed. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -49,6 +63,8 @@ export default function Register() {
                 <input
                   type="text"
                   required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   className="w-full pl-10 h-11 bg-muted/30 border border-border rounded-lg text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary transition-colors placeholder:text-muted-foreground/50"
                   placeholder="Jane Doe"
                 />
@@ -64,6 +80,8 @@ export default function Register() {
                 <input
                   type="email"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 h-11 bg-muted/30 border border-border rounded-lg text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary transition-colors placeholder:text-muted-foreground/50"
                   placeholder="jane@company.com"
                 />
@@ -79,6 +97,8 @@ export default function Register() {
                 <input
                   type="text"
                   required
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
                   className="w-full pl-10 h-11 bg-muted/30 border border-border rounded-lg text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary transition-colors placeholder:text-muted-foreground/50"
                   placeholder="Acme Corp"
                 />
@@ -94,6 +114,9 @@ export default function Register() {
                 <input
                   type="password"
                   required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 h-11 bg-muted/30 border border-border rounded-lg text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary transition-colors placeholder:text-muted-foreground/50"
                   placeholder="••••••••"
                 />

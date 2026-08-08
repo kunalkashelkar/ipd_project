@@ -12,7 +12,7 @@ from backend.app.database.session import async_session_factory
 from backend.app.repositories.scan_repository import ScanRepository
 from backend.app.repositories.notification_repository import NotificationRepository
 from backend.app.workers.celery_app import celery_app
-from backend.app.workers.scan_tasks import AsyncCeleryTask
+from backend.app.workers.base_task import AsyncCeleryTask
 
 
 @celery_app.task(bind=True, base=AsyncCeleryTask, name="send_notification")

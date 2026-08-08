@@ -1,11 +1,25 @@
-import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { TopBar } from '../components/TopBar';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuthStore } from '../store';
 
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, token } = useAuthStore();
+
+  // Auth guard — redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthenticated, token, navigate]);
+
+  if (!isAuthenticated || !token) {
+    return null; // Prevent flash of authenticated content
+  }
 
   return (
     <div className="flex min-h-screen bg-background">

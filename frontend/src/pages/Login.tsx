@@ -4,6 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Mail, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../store';
+import { authService } from '../services/authService';
+import toast from 'react-hot-toast';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,19 +14,28 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock authentication
-    setTimeout(() => {
+    try {
+      const result = await authService.login(email, password);
       login(
-        { id: '1', name: 'Administrator', email, role: 'admin' },
-        'mock-token-xyz'
+        result.user,
+        result.tokens.access_token,
+        result.tokens.refresh_token
       );
-      setIsLoading(false);
+      toast.success('Welcome back, ' + result.user.name + '!');
       navigate('/dashboard');
-    }, 1500);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        'Login failed. Please check your credentials.';
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
