@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     """Central application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=str(PROJECT_ROOT / ".env"),
+        env_file=(str(BACKEND_ROOT / ".env"), str(PROJECT_ROOT / ".env")),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -69,10 +69,16 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 200
     allowed_upload_extensions: str = ".zip,.jar,.java,.py,.js,.ts,.c,.cpp,.h,.hpp"
 
-    # ── AI ─────────────────────────────────────────────────
+    # ── AI & Pipeline ──────────────────────────────────────
     ai_mode: str = "mock"
     model_storage_path: str = "./models"
     ai_device: str = "cpu"
+    joern_home: str = "/opt/joern"
+    joern_parse_timeout: int = 120
+    gnn_model_path: str = "./models/gnn/checkpoints/best_model.pt"
+    embedding_model_name: str = "microsoft/codebert-base"
+    default_vuln_threshold: float = 0.5
+    max_file_size_bytes: int = 10_000_000
 
     # ── Logging ────────────────────────────────────────────
     log_level: str = "DEBUG"
@@ -131,6 +137,27 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    # Backward-compatibility aliases for legacy pipeline routers
+    @property
+    def app_debug(self) -> bool:
+        return self.debug
+
+    @property
+    def app_log_level(self) -> str:
+        return self.log_level
+
+    @property
+    def app_secret_key(self) -> str:
+        return self.secret_key
+
+    @property
+    def upload_dir(self) -> str:
+        return str(self.upload_path)
+
+    @property
+    def allowed_extensions(self) -> str:
+        return self.allowed_upload_extensions
 
 
 @lru_cache

@@ -10,8 +10,9 @@ export function TopBar() {
 
   return (
     <header className="h-16 px-8 flex items-center justify-between border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-30">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium capitalize">
-        <span>Aegis</span>
+      <div className="flex items-center gap-2 font-bold text-foreground opacity-50 hidden md:flex">
+        <span>XAI</span>
+        <span className="text-primary font-black">/</span>
         {paths.map((path, index) => (
           <React.Fragment key={path}>
             <span>/</span>

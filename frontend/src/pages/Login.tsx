@@ -51,7 +51,7 @@ export default function Login() {
             <div className="w-14 h-14 mx-auto rounded-2xl bg-primary flex items-center justify-center shadow-soft group-hover:scale-110 transition-transform">
               <ShieldCheck className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Aegis Kinetic</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">XAI Tool</h1>
           </Link>
           <p className="mt-2 text-sm text-muted-foreground">Sign in to your enterprise workspace</p>
         </div>
@@ -71,7 +71,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 h-11 bg-muted/30 border border-border rounded-lg text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary transition-colors placeholder:text-muted-foreground/50"
-                  placeholder="admin@aegis.io"
+                  placeholder="admin@xaitool.io"
                 />
               </div>
             </div>

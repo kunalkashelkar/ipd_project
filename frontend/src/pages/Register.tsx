@@ -46,7 +46,7 @@ export default function Register() {
             <div className="w-14 h-14 mx-auto rounded-2xl bg-primary flex items-center justify-center shadow-soft group-hover:scale-110 transition-transform">
               <ShieldCheck className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Aegis Kinetic</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">XAI Tool</h1>
           </Link>
           <p className="mt-2 text-sm text-muted-foreground">Request access for your organization</p>
         </div>

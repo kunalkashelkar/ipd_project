@@ -63,10 +63,12 @@ export default function ConnectRepo() {
             <div className="space-y-6">
               {!isAuthorized ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-card bg-muted/10 h-full">
-                  <Github className="w-12 h-12 mb-4 text-foreground" />
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mb-4">
+                    <Github className="w-5 h-5" />
+                  </div>
                   <h3 className="text-xl font-semibold mb-2">Connect to GitHub</h3>
                   <p className="text-muted-foreground text-sm max-w-sm mb-6">
-                    Install the Aegis Kinetic app on your GitHub account or organization to safely import repositories.
+                    Install the XAI Tool app on your GitHub account or organization to safely import repositories.
                   </p>
                   <Button onClick={() => setIsAuthorized(true)}>
                     <Github className="w-4 h-4 mr-2" /> Authorize GitHub Access

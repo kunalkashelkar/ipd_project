@@ -9,7 +9,8 @@ import {
   Bell,
   Settings,
   LogOut,
-  ShieldAlert
+  ShieldAlert,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from './ui/Button';
 
@@ -34,10 +35,10 @@ export function Sidebar() {
   return (
     <aside className="w-64 border-r border-border bg-sidebar flex flex-col h-screen fixed left-0 top-0 z-40">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-soft">
-          <ShieldAlert className="w-5 h-5 text-primary-foreground" />
+        <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-soft">
+          <ShieldCheck className="w-5 h-5 text-primary-foreground" />
         </div>
-        <span className="font-bold text-lg tracking-tight text-foreground">Aegis Kinetic</span>
+        <span className="font-bold text-lg tracking-tight text-foreground">XAI Tool</span>
       </div>
 
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto mt-4 scrollbar-thin scrollbar-thumb-border">
@@ -94,7 +95,7 @@ export function Sidebar() {
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-medium">Administrator</span>
-            <span className="text-xs text-muted-foreground">admin@aegis.io</span>
+            <span className="text-xs text-muted-foreground">admin@xaitool.io</span>
           </div>
         </div>
       </div>

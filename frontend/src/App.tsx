@@ -12,6 +12,7 @@ const ProjectDetail = lazy(() => import('./pages/projects/ProjectDetail'));
 const ScanConfig = lazy(() => import('./pages/projects/ScanConfig'));
 const ScanProgress = lazy(() => import('./pages/projects/ScanProgress'));
 const ScanResultsWorkspace = lazy(() => import('./pages/projects/ScanResultsWorkspace'));
+const ScansList = lazy(() => import('./pages/ScansList'));
 const ConnectRepo = lazy(() => import('./pages/projects/ConnectRepo'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -78,7 +79,7 @@ function App() {
             <Route path="/projects/:id/scan-progress" element={<ScanProgress />} />
             <Route path="/projects/:id/results" element={<ScanResultsWorkspace />} />
 
-            <Route path="/scans" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/scans" element={<ScansList />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/notifications" element={<Notifications />} />
