@@ -14,6 +14,7 @@ class ScanCreate(BaseModel):
     """Create a new scan."""
 
     project_id: uuid.UUID
+    source_snapshot_id: uuid.UUID | None = None
     upload_id: uuid.UUID | None = None
     repository_id: uuid.UUID | None = None
 
@@ -23,6 +24,7 @@ class ScanResponse(BaseModel):
 
     id: uuid.UUID
     project_id: uuid.UUID
+    source_snapshot_id: uuid.UUID | None = None
     upload_id: uuid.UUID | None = None
     repository_id: uuid.UUID | None = None
     created_by: uuid.UUID | None = None

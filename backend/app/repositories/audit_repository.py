@@ -22,6 +22,7 @@ class AuditRepository(BaseRepository[AuditLog]):
         self,
         *,
         user_id: uuid.UUID | None = None,
+        organization_id: uuid.UUID | None = None,
         action: str,
         resource_type: str | None = None,
         resource_id: str | None = None,
@@ -32,6 +33,7 @@ class AuditRepository(BaseRepository[AuditLog]):
         """Create an audit log entry."""
         return await self.create(
             user_id=user_id,
+            organization_id=organization_id,
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -39,6 +41,7 @@ class AuditRepository(BaseRepository[AuditLog]):
             user_agent=user_agent,
             metadata_json=metadata,
         )
+
 
     async def get_user_logs(
         self,

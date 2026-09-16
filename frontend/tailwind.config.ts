@@ -47,13 +47,13 @@ export default {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       borderRadius: {
-        'card': '16px',
-        'table': '14px',
-        'btn': '12px',
-        'input': '10px',
+        'card': '8px',
+        'table': '8px',
+        'btn': '6px',
+        'input': '6px',
       },
       boxShadow: {
-        'soft': '0 4px 16px rgba(0,0,0,0.15)',
+        'soft': '0 1px 3px rgba(0,0,0,0.2)',
       },
     },
   },

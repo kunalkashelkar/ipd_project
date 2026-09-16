@@ -9,10 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies (needed for psycopg2 / asyncpg compilation sometimes)
+# Install system dependencies (needed for psycopg2 / asyncpg compilation sometimes, and git for VCS ingestion)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies

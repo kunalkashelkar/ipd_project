@@ -1,153 +1,499 @@
-import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { useNavigate } from 'react-router-dom';
-import { Github, Search, PlusCircle, CheckCircle2, Copy } from 'lucide-react';
+// ============================================================
+// ConnectRepo.tsx — Phase 3 Source Ingestion & VCS Connection
+// ============================================================
 
-const REPOS = [
-  { id: '1', name: 'Payment API', updated: '2 hours ago', branch: 'main' },
-  { id: '2', name: 'Bank API', updated: '1 day ago', branch: 'main' },
-  { id: '3', name: 'Shopping Cart', updated: '3 days ago', branch: 'develop' },
-  { id: '4', name: 'Inventory', updated: '5 days ago', branch: 'main' },
-];
+import React, { useState, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import {
+  Github,
+  GitBranch,
+  UploadCloud,
+  FileCode2,
+  Layers,
+  ArrowLeft,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  FolderGit2,
+  KeyRound,
+  FileUp,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Breadcrumbs } from '../../components/ui/Breadcrumbs';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Alert } from '../../components/ui/Alert';
+import { snapshotService } from '../../services/snapshotService';
+import { repositoryService } from '../../services/repositoryService';
+import toast from 'react-hot-toast';
 
 export default function ConnectRepo() {
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'github' | 'gitlab' | 'bitbucket' | 'zip' | 'paste'>('github');
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(false);
 
-  const handleImport = () => {
-    setIsImporting(true);
-    setTimeout(() => {
-      navigate('/projects/1?onboarding=true');
-    }, 1500);
+  const [activeTab, setActiveTab] = useState<'zip' | 'files' | 'git' | 'github'>('zip');
+
+  // ZIP upload state
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [zipUploading, setZipUploading] = useState(false);
+  const [zipProgress, setZipProgress] = useState(0);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+
+  // Individual files upload state
+  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
+  const [filesUploading, setFilesUploading] = useState(false);
+  const [filesProgress, setFilesProgress] = useState(0);
+  const filesInputRef = useRef<HTMLInputElement>(null);
+
+  // Git repo state
+  const [gitUrl, setGitUrl] = useState('');
+  const [gitDisplayName, setGitDisplayName] = useState('');
+  const [gitBranch, setGitBranch] = useState('');
+  const [gitConnecting, setGitConnecting] = useState(false);
+
+  // GitHub repo state
+  const [githubUrl, setGithubUrl] = useState('');
+  const [githubToken, setGithubToken] = useState('');
+  const [githubBranch, setGithubBranch] = useState('');
+  const [githubConnecting, setGithubConnecting] = useState(false);
+
+  // ── Handle ZIP Upload ──────────────────────────────────────
+  const handleZipUpload = async () => {
+    if (!zipFile || !projectId) {
+      toast.error('Please select a ZIP archive first');
+      return;
+    }
+
+    setZipUploading(true);
+    setZipProgress(0);
+    try {
+      const snapshot = await snapshotService.uploadZip(
+        projectId,
+        zipFile,
+        (progressEvent) => {
+          if (progressEvent.total) {
+            setZipProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+          }
+        }
+      );
+      toast.success('Archive uploaded. Source snapshot queued for processing!');
+      navigate(`/projects/${projectId}/snapshots/${snapshot.id}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to upload ZIP archive');
+    } finally {
+      setZipUploading(false);
+    }
+  };
+
+  // ── Handle Individual Files Upload ─────────────────────────
+  const handleFilesUpload = async () => {
+    if (sourceFiles.length === 0 || !projectId) {
+      toast.error('Please select at least one source file');
+      return;
+    }
+
+    setFilesUploading(true);
+    setFilesProgress(0);
+    try {
+      const snapshot = await snapshotService.uploadFiles(
+        projectId,
+        sourceFiles,
+        undefined,
+        (progressEvent) => {
+          if (progressEvent.total) {
+            setFilesProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+          }
+        }
+      );
+      toast.success(`${sourceFiles.length} files uploaded to snapshot!`);
+      navigate(`/projects/${projectId}/snapshots/${snapshot.id}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to upload source files');
+    } finally {
+      setFilesUploading(false);
+    }
+  };
+
+  // ── Handle Git Connect ─────────────────────────────────────
+  const handleGitConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gitUrl.trim() || !projectId) {
+      toast.error('Repository URL is required');
+      return;
+    }
+
+    setGitConnecting(true);
+    try {
+      const repo = await repositoryService.connectRepository(projectId, {
+        provider: 'local_git',
+        repo_url: gitUrl.trim(),
+        display_name: gitDisplayName.trim() || undefined,
+        default_branch: gitBranch.trim() || undefined,
+      });
+      toast.success(`Git repository '${repo.display_name}' connected and sync queued!`);
+      navigate(`/projects/${projectId}?tab=repositories`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to connect Git repository');
+    } finally {
+      setGitConnecting(false);
+    }
+  };
+
+  // ── Handle GitHub Connect ──────────────────────────────────
+  const handleGithubConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!githubUrl.trim() || !projectId) {
+      toast.error('GitHub repository URL is required');
+      return;
+    }
+
+    setGithubConnecting(true);
+    try {
+      const repo = await repositoryService.connectRepository(projectId, {
+        provider: 'github',
+        repo_url: githubUrl.trim(),
+        access_token: githubToken.trim() || undefined,
+        default_branch: githubBranch.trim() || undefined,
+      });
+      toast.success(`GitHub repository '${repo.display_name}' connected and sync queued!`);
+      navigate(`/projects/${projectId}?tab=repositories`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to connect GitHub repository');
+    } finally {
+      setGithubConnecting(false);
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div className="text-center max-w-xl mx-auto pt-8">
-        <h1 className="text-3xl font-bold tracking-tight">Connect your repository</h1>
-        <p className="text-muted-foreground mt-2">
-          Select a Git provider to import an existing project or upload your source code directly to begin vulnerability detection.
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+      <PageHeader
+        breadcrumbs={
+          <Breadcrumbs
+            items={[
+              { label: 'Projects', to: '/projects' },
+              { label: 'Project', to: projectId ? `/projects/${projectId}` : '/projects' },
+              { label: 'Connect Source' },
+            ]}
+          />
+        }
+        title="Connect Source Code"
+        description="Attach source code to create immutable snapshots for static graph analysis and vulnerability detection."
+      />
 
-      <Card className="mt-8">
+      <Card>
+        {/* Navigation Tabs */}
         <div className="flex border-b border-border bg-muted/20 overflow-x-auto scrollbar-none">
           {[
-            { id: 'github', label: 'GitHub', icon: Github },
-            { id: 'gitlab', label: 'GitLab', icon: () => <span className="font-bold text-orange-500 mr-2">🦊</span> },
-            { id: 'bitbucket', label: 'Bitbucket', icon: () => <span className="font-bold text-blue-500 mr-2">B</span> },
-            { id: 'zip', label: 'ZIP File', icon: PlusCircle },
-            { id: 'paste', label: 'Paste Code', icon: Copy },
-          ].map(tab => (
+            { id: 'zip', label: 'Upload ZIP Archive', icon: <UploadCloud className="w-4 h-4 mr-2" /> },
+            { id: 'files', label: 'Upload Files', icon: <FileUp className="w-4 h-4 mr-2" /> },
+            { id: 'git', label: 'Git Repository', icon: <FolderGit2 className="w-4 h-4 mr-2" /> },
+            { id: 'github', label: 'GitHub Repository', icon: <Github className="w-4 h-4 mr-2" /> },
+          ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center px-6 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-                activeTab === tab.id 
-                  ? 'border-primary text-foreground' 
+                activeTab === tab.id
+                  ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              {tab.id === 'github' ? <Github className="w-4 h-4 mr-2" /> : <tab.icon className="w-4 h-4 mr-2" />}
+              {tab.icon}
               {tab.label}
             </button>
           ))}
         </div>
 
-        <CardContent className="p-8 min-h-[400px]">
-          {activeTab === 'github' && (
-            <div className="space-y-6">
-              {!isAuthorized ? (
-                <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-card bg-muted/10 h-full">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mb-4">
-                    <Github className="w-5 h-5" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">Connect to GitHub</h3>
-                  <p className="text-muted-foreground text-sm max-w-sm mb-6">
-                    Install the XAI Tool app on your GitHub account or organization to safely import repositories.
-                  </p>
-                  <Button onClick={() => setIsAuthorized(true)}>
-                    <Github className="w-4 h-4 mr-2" /> Authorize GitHub Access
-                  </Button>
+        <CardContent className="p-8 min-h-[360px]">
+          {/* TAB 1: ZIP Upload */}
+          {activeTab === 'zip' && (
+            <div className="space-y-6 max-w-xl mx-auto">
+              <input
+                ref={zipInputRef}
+                type="file"
+                accept=".zip,.tar,.gz,.jar"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) setZipFile(e.target.files[0]);
+                }}
+              />
+
+              <div
+                onClick={() => zipInputRef.current?.click()}
+                className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-all space-y-3"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <UploadCloud className="w-6 h-6" />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Connected as rahul-dev
-                    </h3>
-                    <div className="relative w-64">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input 
-                        type="text" 
-                        placeholder="Search repositories..." 
-                        className="w-full bg-background border border-border rounded-input pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
+                {zipFile ? (
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{zipFile.name}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                      {(zipFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </p>
                   </div>
-
-                  <div className="border border-border rounded-card overflow-hidden">
-                    <div className="bg-muted/30 px-4 py-3 border-b border-border text-sm font-medium">Select a repository</div>
-                    <div className="divide-y divide-border/50 max-h-[300px] overflow-y-auto">
-                      {REPOS.map((repo) => (
-                         <label 
-                          key={repo.id}
-                          className={`flex items-center justify-between p-4 cursor-pointer transition-colors hover:bg-muted/20 ${selectedRepo === repo.id ? 'bg-primary/5' : ''}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input 
-                              type="radio" 
-                              name="repo_selection" 
-                              className="accent-primary w-4 h-4"
-                              checked={selectedRepo === repo.id}
-                              onChange={() => setSelectedRepo(repo.id)}
-                            />
-                            <div>
-                              <div className="font-medium text-foreground">{repo.name}</div>
-                              <div className="text-xs text-muted-foreground mt-0.5">Updated {repo.updated}</div>
-                            </div>
-                          </div>
-                          {selectedRepo === repo.id && (
-                             <select className="h-8 px-2 bg-background border border-border rounded text-xs focus:ring-1 focus:ring-primary outline-none">
-                               <option>{repo.branch}</option>
-                               <option>master</option>
-                             </select>
-                          )}
-                        </label>
-                      ))}
-                    </div>
+                ) : (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Select or Drag ZIP Archive</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Max upload size: 100 MB. Extracted in isolated worker environment with strict path traversal protection.
+                    </p>
                   </div>
+                )}
+              </div>
 
-                  <div className="flex justify-end pt-4">
-                    <Button 
-                      onClick={handleImport}
-                      disabled={!selectedRepo || isImporting}
-                      className="min-w-[150px]"
-                    >
-                      {isImporting ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Importing...
-                        </div>
-                      ) : (
-                        'Import Repository'
-                      )}
-                    </Button>
+              {zipUploading && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Uploading archive to object storage...</span>
+                    <span>{zipProgress}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-primary h-full transition-all" style={{ width: `${zipProgress}%` }} />
                   </div>
                 </div>
               )}
+
+              <Button
+                className="w-full text-xs"
+                disabled={!zipFile || zipUploading}
+                onClick={handleZipUpload}
+              >
+                {zipUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
+                    Uploading & Ingesting...
+                  </>
+                ) : (
+                  'Upload and Process Snapshot'
+                )}
+              </Button>
             </div>
           )}
-          
-          {activeTab !== 'github' && (
-             <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground h-full">
-               <p>This integration is mocked out for the scope of the current demo.</p>
-               <p className="text-sm mt-2">Please select GitHub to proceed.</p>
-             </div>
+
+          {/* TAB 2: Individual Files Upload */}
+          {activeTab === 'files' && (
+            <div className="space-y-6 max-w-xl mx-auto">
+              <input
+                ref={filesInputRef}
+                type="file"
+                multiple
+                accept=".c,.cpp,.h,.hpp,.java,.py,.js,.jsx,.ts,.tsx,.go,.rs,.cs,.php"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setSourceFiles(Array.from(e.target.files));
+                  }
+                }}
+              />
+
+              <div
+                onClick={() => filesInputRef.current?.click()}
+                className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/20 transition-all space-y-3"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <FileUp className="w-6 h-6" />
+                </div>
+                {sourceFiles.length > 0 ? (
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {sourceFiles.length} file(s) selected
+                    </p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                      Total: {(sourceFiles.reduce((acc, f) => acc + f.size, 0) / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Select Individual Source Files</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select one or multiple code files. All selected files will be bound to a single immutable snapshot.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {sourceFiles.length > 0 && (
+                <div className="max-h-40 overflow-y-auto border border-border rounded-md p-2 space-y-1 text-xs">
+                  {sourceFiles.map((f, idx) => (
+                    <div key={idx} className="flex justify-between font-mono text-muted-foreground">
+                      <span className="truncate max-w-sm">{f.name}</span>
+                      <span>{(f.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {filesUploading && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Uploading files...</span>
+                    <span>{filesProgress}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-primary h-full transition-all" style={{ width: `${filesProgress}%` }} />
+                  </div>
+                </div>
+              )}
+
+              <Button
+                className="w-full text-xs"
+                disabled={sourceFiles.length === 0 || filesUploading}
+                onClick={handleFilesUpload}
+              >
+                {filesUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
+                    Uploading Files...
+                  </>
+                ) : (
+                  `Upload ${sourceFiles.length} Files to Snapshot`
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* TAB 3: Git Repository */}
+          {activeTab === 'git' && (
+            <form onSubmit={handleGitConnect} className="space-y-4 max-w-xl mx-auto">
+              <div className="p-3 bg-muted/30 border border-border rounded-lg text-xs text-muted-foreground space-y-1">
+                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                  <FolderGit2 className="w-3.5 h-3.5 text-primary" /> Git Clone & Ingestion Pipeline
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  Synchronize with any remote Git repository over HTTPS. Cloned in an isolated sandbox with Git hooks disabled, depth limits, and strict path verification.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Git Repository URL *</label>
+                <input
+                  type="text"
+                  placeholder="https://github.com/example/repo.git or https://gitlab.com/..."
+                  value={gitUrl}
+                  onChange={(e) => setGitUrl(e.target.value)}
+                  className="w-full bg-card border border-border rounded-md px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  required
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Standard Git clone reference. Worker clones with hooks disabled and safe depth limits.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Display Name (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="my-core-service"
+                    value={gitDisplayName}
+                    onChange={(e) => setGitDisplayName(e.target.value)}
+                    className="w-full bg-card border border-border rounded-md px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Tracking Branch (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Auto-detect (e.g. main or master)"
+                    value={gitBranch}
+                    onChange={(e) => setGitBranch(e.target.value)}
+                    className="w-full bg-card border border-border rounded-md px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Leave blank to automatically discover the remote repository's default branch.
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full text-xs mt-2"
+                disabled={gitConnecting || !gitUrl.trim()}
+              >
+                {gitConnecting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
+                    Connecting Repository...
+                  </>
+                ) : (
+                  'Connect Git Repository'
+                )}
+              </Button>
+            </form>
+          )}
+
+          {/* TAB 4: GitHub Repository */}
+          {activeTab === 'github' && (
+            <form onSubmit={handleGithubConnect} className="space-y-4 max-w-xl mx-auto">
+              <div className="p-3 bg-muted/30 border border-border rounded-lg text-xs text-muted-foreground space-y-1">
+                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Github className="w-3.5 h-3.5 text-foreground" /> Direct GitHub VCS Synchronization
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  Connect any public or token-authenticated GitHub repository. VulnScan automatically discovers remote branches, tracks commit SHA provenance, and creates an immutable snapshot via isolated worker extraction.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">GitHub Repository URL / Slug *</label>
+                <input
+                  type="text"
+                  placeholder="https://github.com/org/repo or owner/repo"
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                  className="w-full bg-card border border-border rounded-md px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground flex items-center justify-between">
+                  <span>Personal Access Token (Optional)</span>
+                  <span className="text-[10px] text-muted-foreground">Required for private repositories</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="ghp_..."
+                  value={githubToken}
+                  onChange={(e) => setGithubToken(e.target.value)}
+                  className="w-full bg-card border border-border rounded-md px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Public repositories do not require a token. Tokens are encrypted/redacted and never exposed in responses or logs.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Default / Tracking Branch (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Auto-detect (e.g. main or master)"
+                  value={githubBranch}
+                  onChange={(e) => setGithubBranch(e.target.value)}
+                  className="w-full bg-card border border-border rounded-md px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Leave blank to automatically discover the repository's default branch (main or master).
+                </p>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full text-xs mt-2"
+                disabled={githubConnecting || !githubUrl.trim()}
+              >
+                {githubConnecting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />
+                    Connecting & Syncing GitHub Repo...
+                  </>
+                ) : (
+                  'Connect GitHub Repository'
+                )}
+              </Button>
+            </form>
           )}
         </CardContent>
       </Card>

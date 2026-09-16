@@ -12,7 +12,8 @@ import { ScanResult } from '../../types';
 import Editor from '@monaco-editor/react';
 
 export default function ScanResultsWorkspace() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id?: string; projectId?: string }>();
+  const id = params.projectId || params.id;
   const [searchParams] = useSearchParams();
   const scanId = searchParams.get('scan_id');
 
@@ -265,20 +266,24 @@ export default function ScanResultsWorkspace() {
 
                   {activeTab === 'graph' && (
                     <div className="h-full flex items-center justify-center border border-border rounded-xl bg-card">
-                      <div className="text-center text-muted-foreground">
-                        <Layers className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>Cytoscape Graph Visualization renders here</p>
-                        <p className="text-xs mt-2">Integrating existing GraphViewer.tsx</p>
+                      <div className="text-center text-muted-foreground p-6 max-w-md">
+                        <Layers className="w-12 h-12 mx-auto mb-4 opacity-50 text-primary" />
+                        <p className="font-medium text-foreground">Interactive Code Property Graph Visualization</p>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          Visual AST, CFG, and PDG graph rendering with interactive node inspection is scheduled for Phase 4 (Graph Construction & Preprocessing).
+                        </p>
                       </div>
                     </div>
                   )}
 
                   {activeTab === 'taint' && (
                     <div className="h-full flex items-center justify-center border border-border rounded-xl bg-card">
-                      <div className="text-center text-muted-foreground">
-                        <GitBranch className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>Taint Analysis Data Flow renders here</p>
-                        <p className="text-xs mt-2">Integrating existing TaintReport.tsx flow trees</p>
+                      <div className="text-center text-muted-foreground p-6 max-w-md">
+                        <GitBranch className="w-12 h-12 mx-auto mb-4 opacity-50 text-primary" />
+                        <p className="font-medium text-foreground">Taint Analysis Data Flow</p>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          Source-to-sink taint propagation and data flow path traversal will populate in Phase 4 (Graph Construction & Preprocessing).
+                        </p>
                       </div>
                     </div>
                   )}

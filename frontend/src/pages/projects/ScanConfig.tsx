@@ -1,82 +1,142 @@
+// ============================================================
+// ScanConfig.tsx — Phase 3 Provenance-Bound Scan Configuration
+// ============================================================
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Play, Settings2, Shield, X, ScanEye, Zap, FileText, Loader2 } from 'lucide-react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import {
+  Play,
+  Settings2,
+  Shield,
+  X,
+  ScanEye,
+  Zap,
+  FileText,
+  Loader2,
+  Layers,
+  GitCommit,
+  AlertCircle,
+  Plus,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
+import { snapshotService } from '../../services/snapshotService';
 import { uploadService } from '../../services/uploadService';
 import { scanService } from '../../services/scanService';
-import { Upload } from '../../types';
+import { SourceSnapshot, Upload } from '../../types';
 import toast from 'react-hot-toast';
 
 export default function ScanConfig() {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id?: string; projectId?: string }>();
+  const id = params.projectId || params.id;
+
   const [isStarting, setIsStarting] = useState(false);
+  const [snapshots, setSnapshots] = useState<SourceSnapshot[]>([]);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string>('');
+  const [loadingSources, setLoadingSources] = useState(true);
+
+  // Fallback legacy uploads
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [selectedUploadId, setSelectedUploadId] = useState<string>('');
-  const [loadingUploads, setLoadingUploads] = useState(true);
-
-  const [options, setOptions] = useState({
-    static: true,
-    ai: true,
-    explain: true,
-    fix: true,
-    report: true
-  });
 
   useEffect(() => {
     if (!id) return;
-    async function loadUploads() {
-      setLoadingUploads(true);
+    async function loadSources() {
+      setLoadingSources(true);
       try {
-        const data = await uploadService.listUploads(id!, { page_size: 50 });
-        setUploads(data.items);
-        if (data.items.length > 0) {
-          setSelectedUploadId(data.items[0].id);
+        const [snapsRes, uploadsRes] = await Promise.allSettled([
+          snapshotService.listSnapshots(id!, { page_size: 50 }),
+          uploadService.listUploads(id!, { page_size: 50 }),
+        ]);
+
+        if (snapsRes.status === 'fulfilled') {
+          setSnapshots(snapsRes.value.items);
+          const firstReady = snapsRes.value.items.find((s) => s.status === 'ready');
+          if (firstReady) {
+            setSelectedSnapshotId(firstReady.id);
+          } else if (snapsRes.value.items.length > 0) {
+            setSelectedSnapshotId(snapsRes.value.items[0].id);
+          }
+        }
+
+        if (uploadsRes.status === 'fulfilled') {
+          setUploads(uploadsRes.value.items);
+          if (uploadsRes.value.items.length > 0) {
+            setSelectedUploadId(uploadsRes.value.items[0].id);
+          }
         }
       } catch {
-        // Handled by interceptor
+        // Handled
       } finally {
-        setLoadingUploads(false);
+        setLoadingSources(false);
       }
     }
-    loadUploads();
+    loadSources();
   }, [id]);
 
-  const handleStartScan = async () => {
-    if (!id || !selectedUploadId) {
-      toast.error('Please select an upload to scan.');
-      return;
-    }
+  const selectedSnapshot = snapshots.find((s) => s.id === selectedSnapshotId);
+  const isSnapshotReady = selectedSnapshot?.status === 'ready';
 
-    setIsStarting(true);
-    try {
-      const scan = await scanService.createScan({
-        project_id: id,
-        upload_id: selectedUploadId,
-      });
-      toast.success('Scan started!');
-      navigate(`/projects/${id}/scan-progress?scan_id=${scan.id}`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to start scan.');
-    } finally {
-      setIsStarting(false);
+  const handleStartScan = async () => {
+    if (!id) return;
+
+    if (snapshots.length > 0) {
+      if (!selectedSnapshotId) {
+        toast.error('Please select a source snapshot to scan.');
+        return;
+      }
+      if (!isSnapshotReady) {
+        toast.error('Only snapshots in READY state can be scanned.');
+        return;
+      }
+
+      setIsStarting(true);
+      try {
+        const scan = await scanService.createScan({
+          project_id: id,
+          source_snapshot_id: selectedSnapshotId,
+        });
+        toast.success('Scan started against source snapshot!');
+        navigate(`/projects/${id}/scan-progress?scan_id=${scan.id}`);
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to start scan.');
+      } finally {
+        setIsStarting(false);
+      }
+    } else if (selectedUploadId) {
+      // Legacy fallback
+      setIsStarting(true);
+      try {
+        const scan = await scanService.createScan({
+          project_id: id,
+          upload_id: selectedUploadId,
+        });
+        toast.success('Scan started!');
+        navigate(`/projects/${id}/scan-progress?scan_id=${scan.id}`);
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to start scan.');
+      } finally {
+        setIsStarting(false);
+      }
+    } else {
+      toast.error('Please attach or upload source code first.');
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-lg"
       >
         <Card className="border-border shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="absolute top-4 right-4 w-8 h-8 p-0"
             onClick={() => navigate(-1)}
           >
@@ -84,29 +144,100 @@ export default function ScanConfig() {
           </Button>
 
           <CardHeader className="pb-4">
-            <CardTitle className="text-2xl flex items-center gap-2">
-              <Settings2 className="w-6 h-6 text-primary" /> Choose Analysis
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-primary" /> Configure Analysis Run
             </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">Configure vulnerability detection parameters.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Select an immutable source snapshot as the scan provenance boundary.
+            </p>
           </CardHeader>
-          
+
           <CardContent className="space-y-4">
-            {/* Upload Selector */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Upload to Scan *</label>
-              {loadingUploads ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading uploads...
+            {/* Source Snapshot Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground flex items-center justify-between">
+                <span>Target Source Snapshot *</span>
+                <span className="text-[10px] text-muted-foreground font-mono">Immutable Provenance</span>
+              </label>
+
+              {loadingSources ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" /> Loading snapshots...
                 </div>
-              ) : uploads.length === 0 ? (
-                <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
-                  No uploads found. Please upload source code first.
+              ) : snapshots.length === 0 && uploads.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-md border border-border space-y-2">
+                  <p>No source code found. Ingest source code to create an immutable snapshot.</p>
+                  <Link to={`/projects/${id}/repository`}>
+                    <Button size="sm" variant="outline" className="text-xs h-7 gap-1">
+                      <Plus className="w-3 h-3" /> Connect Source
+                    </Button>
+                  </Link>
+                </div>
+              ) : snapshots.length > 0 ? (
+                <div className="space-y-2">
+                  <select
+                    value={selectedSnapshotId}
+                    onChange={(e) => setSelectedSnapshotId(e.target.value)}
+                    className="w-full h-9 px-3 bg-background border border-border rounded-md text-xs focus:ring-1 focus:ring-primary outline-none"
+                  >
+                    {snapshots.map((s) => (
+                      <option key={s.id} value={s.id} disabled={s.status !== 'ready'}>
+                        [{s.status.toUpperCase()}] {s.source_type.toUpperCase()} • {s.file_count} files •{' '}
+                        {s.commit_sha ? `commit ${s.commit_sha.slice(0, 7)}` : new Date(s.created_at).toLocaleDateString()}
+                        {s.status !== 'ready' ? ' (Not Ready)' : ''}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Selected Snapshot Details Preview */}
+                  {selectedSnapshot && (
+                    <div className="p-3 bg-muted/30 border border-border rounded-md space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Snapshot Status:</span>
+                        <span
+                          className={`font-semibold capitalize ${
+                            selectedSnapshot.status === 'ready'
+                              ? 'text-emerald-500'
+                              : selectedSnapshot.status === 'failed'
+                              ? 'text-destructive'
+                              : 'text-amber-500'
+                          }`}
+                        >
+                          {selectedSnapshot.status}
+                        </span>
+                      </div>
+
+                      {selectedSnapshot.commit_sha && (
+                        <div className="flex items-center justify-between font-mono text-[11px]">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <GitCommit className="w-3 h-3 text-primary" /> Commit:
+                          </span>
+                          <span>{selectedSnapshot.commit_sha.slice(0, 10)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Detected Languages:</span>
+                        <span className="font-mono">
+                          {Object.keys(selectedSnapshot.detected_languages || {}).join(', ') || 'General'}
+                        </span>
+                      </div>
+
+                      {!isSnapshotReady && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-amber-500 pt-1 border-t border-border/40">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>Only READY snapshots can be scanned. Wait for processing to complete.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
+                /* Legacy Upload selector if no Phase 3 snapshots yet */
                 <select
                   value={selectedUploadId}
                   onChange={(e) => setSelectedUploadId(e.target.value)}
-                  className="w-full h-10 px-3 bg-background border border-border rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none"
+                  className="w-full h-9 px-3 bg-background border border-border rounded-md text-xs focus:ring-1 focus:ring-primary outline-none"
                 >
                   {uploads.map((u) => (
                     <option key={u.id} value={u.id}>
@@ -117,46 +248,89 @@ export default function ScanConfig() {
               )}
             </div>
 
-            <div className="space-y-3">
+            {/* Analysis Pipeline Modules */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-foreground">Analysis Pipeline Modules</label>
               {[
-                { id: 'static', label: 'Static Analysis', desc: 'Basic AST pattern matching and linting.', icon: Shield },
-                { id: 'ai', label: 'AI Detection', desc: 'Deep Graph Neural Network vulnerability inference.', icon: ScanEye },
-                { id: 'explain', label: 'Explainability', desc: 'Generate SHAP heatmaps for vulnerable nodes.', icon: Zap },
-                { id: 'fix', label: 'AI Fix', desc: 'Pre-compute automated LLM remediation steps.', icon: Zap },
-                { id: 'report', label: 'Generate Report', desc: 'Compile findings into a downloadable format.', icon: FileText },
-              ].map(opt => (
-                <label 
-                  key={opt.id} 
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    options[opt.id as keyof typeof options] 
-                      ? 'border-primary/50 bg-primary/5' 
-                      : 'border-border bg-card hover:bg-muted/50'
+                {
+                  id: 'static',
+                  label: 'Static Code & Preprocessing Analysis',
+                  desc: 'Deterministic tokenization, AST extraction, and function indexing.',
+                  icon: Shield,
+                  active: true,
+                },
+                {
+                  id: 'ai',
+                  label: 'AI Vulnerability Detection',
+                  desc: 'Multi-layer CodeBERT & Graph Neural Network classification.',
+                  icon: ScanEye,
+                  active: true,
+                },
+                {
+                  id: 'report',
+                  label: 'Security Report Generation',
+                  desc: 'Compile scan findings into structured JSON/PDF report upon completion.',
+                  icon: FileText,
+                  active: true,
+                },
+                {
+                  id: 'explain',
+                  label: 'Explainability (SHAP & GNN Explainer)',
+                  desc: 'Generate graph node heatmaps. (Roadmap: Phase 6)',
+                  icon: Zap,
+                  active: false,
+                },
+                {
+                  id: 'fix',
+                  label: 'Autonomous Remediation',
+                  desc: 'Automated patch generation and validation. (Roadmap: Phase 6)',
+                  icon: Zap,
+                  active: false,
+                },
+              ].map((opt) => (
+                <div
+                  key={opt.id}
+                  className={`flex items-start gap-3 p-2.5 rounded-md border transition-colors ${
+                    opt.active ? 'border-border bg-card' : 'border-border/60 bg-muted/20 opacity-70'
                   }`}
                 >
                   <div className="pt-0.5">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 accent-primary rounded text-primary focus:ring-primary focus:ring-offset-background" 
-                      checked={options[opt.id as keyof typeof options]}
-                      onChange={(e) => setOptions({...options, [opt.id]: e.target.checked})}
+                    <input
+                      type="checkbox"
+                      className="w-3.5 h-3.5 accent-primary rounded text-primary focus:ring-primary focus:ring-offset-background"
+                      checked={opt.active}
+                      disabled={!opt.active}
+                      readOnly
                     />
                   </div>
-                  <div>
-                    <div className="font-medium text-sm text-foreground flex items-center gap-2">
-                      {<opt.icon className="w-3.5 h-3.5 text-muted-foreground" />} {opt.label}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-xs text-foreground flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <opt.icon className="w-3.5 h-3.5 text-muted-foreground" /> {opt.label}
+                      </span>
+                      {opt.active ? (
+                        <span className="text-[10px] text-emerald-400 font-normal">Active in Pipeline</span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-normal">Planned</span>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{opt.desc}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{opt.desc}</div>
                   </div>
-                </label>
+                </div>
               ))}
             </div>
           </CardContent>
-          
+
           <CardFooter className="bg-muted/20 border-t border-border p-6 flex justify-between mt-2">
-            <Button variant="ghost" onClick={() => navigate(-1)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleStartScan}
-              disabled={isStarting || !selectedUploadId}
+              disabled={
+                isStarting ||
+                (snapshots.length > 0 ? !isSnapshotReady : !selectedUploadId)
+              }
               className="min-w-[140px]"
             >
               {isStarting ? (
@@ -165,7 +339,9 @@ export default function ScanConfig() {
                   Starting...
                 </div>
               ) : (
-                <><Play className="w-4 h-4 mr-2" /> Start Scan</>
+                <>
+                  <Play className="w-4 h-4 mr-2" /> Start Scan
+                </>
               )}
             </Button>
           </CardFooter>

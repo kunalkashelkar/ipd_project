@@ -28,6 +28,9 @@ class Scan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     repository_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("repositories.id", ondelete="SET NULL"), nullable=True
     )
+    source_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_snapshots.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -50,6 +53,9 @@ class Scan(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="scans")  # noqa: F821
     upload: Mapped["Upload | None"] = relationship("Upload", back_populates="scans")  # noqa: F821
+    source_snapshot: Mapped["SourceSnapshot | None"] = relationship(  # noqa: F821
+        "SourceSnapshot", back_populates="scans"
+    )
     scan_logs: Mapped[list["ScanLog"]] = relationship(  # noqa: F821
         "ScanLog", back_populates="scan", cascade="all, delete-orphan"
     )

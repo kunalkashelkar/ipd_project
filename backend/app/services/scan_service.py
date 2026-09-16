@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.exceptions import ConflictError, NotFoundError, ValidationError
@@ -27,6 +28,7 @@ class ScanService:
         self,
         *,
         project_id: uuid.UUID,
+        source_snapshot_id: uuid.UUID | None = None,
         upload_id: uuid.UUID | None = None,
         repository_id: uuid.UUID | None = None,
         user_id: uuid.UUID,
@@ -34,16 +36,29 @@ class ScanService:
         """Create a new scan and queue it for processing.
 
         Validates:
-        - Either upload_id or repository_id must be provided
+        - Either source_snapshot_id, upload_id, or repository_id must be provided
+        - If source_snapshot_id is provided, it must belong to the project and be in READY status
         - No active scan already running for the project
-        - Upload exists and belongs to the project
         """
-        if upload_id is None and repository_id is None:
-            raise ValidationError("Either upload_id or repository_id is required")
+        if source_snapshot_id is None and upload_id is None and repository_id is None:
+            raise ValidationError("Either source_snapshot_id, upload_id, or repository_id is required")
 
         # Check for active scans
         if await self.scan_repo.has_active_scan(project_id):
             raise ConflictError("Project already has an active scan")
+
+        # Validate snapshot if provided
+        if source_snapshot_id:
+            from backend.app.models.source_snapshot import SourceSnapshot
+            stmt = select(SourceSnapshot).where(SourceSnapshot.id == source_snapshot_id)
+            res = await self.db.execute(stmt)
+            snapshot = res.scalar_one_or_none()
+            if snapshot is None or snapshot.project_id != project_id:
+                raise NotFoundError(f"Snapshot {source_snapshot_id} not found in this project")
+            if snapshot.status != "ready":
+                raise ValidationError(
+                    f"Cannot scan snapshot in '{snapshot.status}' state. Only READY snapshots can be scanned."
+                )
 
         # Validate upload if provided
         if upload_id:
@@ -56,6 +71,7 @@ class ScanService:
         # Create scan
         scan = await self.scan_repo.create(
             project_id=project_id,
+            source_snapshot_id=source_snapshot_id,
             upload_id=upload_id,
             repository_id=repository_id,
             created_by=user_id,

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, Project, Notification } from './types';
+import { User, Project, Notification, Organization } from './types';
+import { authStorage } from './services/authStorage';
 
 // ── Auth Store ────────────────────────────────────────────────
 
@@ -9,9 +10,15 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
-  login: (user: User, accessToken: string, refreshToken: string) => void;
+  activeOrganization: Organization | null;
+  activeMemberRole: string | null;
+  organizations: Organization[];
+  login: (user: User, accessToken: string, refreshToken: string, organization?: Organization, organizations?: Organization[]) => void;
   logout: () => void;
   setUser: (user: User) => void;
+  setActiveOrganization: (org: Organization | null) => void;
+  setActiveMemberRole: (role: string | null) => void;
+  setOrganizations: (orgs: Organization[]) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -21,11 +28,47 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isAuthenticated: false,
-      login: (user, token, refreshToken) =>
-        set({ user, token, refreshToken, isAuthenticated: true }),
-      logout: () =>
-        set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
+      activeOrganization: null,
+      activeMemberRole: null,
+      organizations: [],
+      login: (user, token, refreshToken, organization, organizations) => {
+        if (organization) {
+          authStorage.setActiveOrganizationId(organization.id);
+        } else {
+          authStorage.setActiveOrganizationId(null);
+        }
+        set({
+          user,
+          token,
+          refreshToken,
+          isAuthenticated: true,
+          activeOrganization: organization || null,
+          activeMemberRole: organization?.current_user_role || null,
+          organizations: organizations || (organization ? [organization] : []),
+        });
+      },
+      logout: () => {
+        authStorage.clearSession();
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+          activeOrganization: null,
+          activeMemberRole: null,
+          organizations: [],
+        });
+      },
       setUser: (user) => set({ user }),
+      setActiveOrganization: (org) => {
+        authStorage.setActiveOrganizationId(org ? org.id : null);
+        set({
+          activeOrganization: org,
+          activeMemberRole: org?.current_user_role || null,
+        });
+      },
+      setActiveMemberRole: (activeMemberRole) => set({ activeMemberRole }),
+      setOrganizations: (organizations) => set({ organizations }),
     }),
     {
       name: 'auth-storage',

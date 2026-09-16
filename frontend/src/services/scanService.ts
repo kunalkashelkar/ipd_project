@@ -10,6 +10,7 @@ export const scanService = {
     project_id: string;
     upload_id?: string;
     repository_id?: string;
+    source_snapshot_id?: string;
   }): Promise<Scan> {
     const { data: scan } = await apiClient.post<Scan>('/scans', data);
     return scan;

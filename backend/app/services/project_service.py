@@ -1,5 +1,5 @@
 # ============================================================
-# Project Service
+# Project Service (Phase 2 Tenant-Scoped)
 # ============================================================
 
 from __future__ import annotations
@@ -8,31 +8,38 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.exceptions import AuthorizationError, NotFoundError
+from backend.app.core.exceptions import ConflictError, NotFoundError
+from backend.app.models.project import Project
+from backend.app.repositories.audit_repository import AuditRepository
 from backend.app.repositories.project_repository import ProjectRepository
-from backend.app.services.audit_service import AuditService
 
 
 class ProjectService:
-    """Project management business logic."""
+    """Project management business logic strictly scoped to Organizations."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = ProjectRepository(db)
-        self.audit = AuditService(db)
+        self.audit_repo = AuditRepository(db)
 
     async def create_project(
         self,
         *,
+        org_id: uuid.UUID,
         name: str,
         description: str | None = None,
         language: str | None = None,
         default_branch: str | None = "main",
         owner_id: uuid.UUID,
         ip_address: str | None = None,
-    ):
-        """Create a new project."""
+    ) -> Project:
+        """Create a new project strictly scoped to the organization."""
+        # Enforce uniqueness of active project names within the organization
+        if await self.repo.check_name_exists_in_org(org_id, name):
+            raise ConflictError(f"A project named '{name}' already exists in this organization")
+
         project = await self.repo.create(
+            organization_id=org_id,
             name=name,
             description=description,
             language=language,
@@ -40,94 +47,92 @@ class ProjectService:
             owner_id=owner_id,
             created_by=owner_id,
         )
-        await self.audit.log(
+
+        await self.audit_repo.log_action(
             user_id=owner_id,
+            organization_id=org_id,
             action="project.created",
             resource_type="project",
             resource_id=str(project.id),
             ip_address=ip_address,
+            metadata={"name": name},
         )
+
+        await self.db.commit()
         return project
 
-    async def get_project(self, project_id: uuid.UUID, user_id: uuid.UUID, role: str):
-        """Get a single project with access check."""
-        project = await self.repo.get_by_id(project_id)
-        if project is None:
-            raise NotFoundError(f"Project {project_id} not found")
-
-        if role != "admin" and project.owner_id != user_id:
-            raise AuthorizationError("You do not have access to this project")
-
-        return project
-
-    async def list_projects(
+    async def list_org_projects(
         self,
-        user_id: uuid.UUID,
-        role: str,
+        org_id: uuid.UUID,
         *,
         page: int = 1,
         page_size: int = 20,
         search: str | None = None,
-    ):
-        """List projects for a user."""
-        if role == "admin":
-            # Admins see all projects
-            filters = []
-            if search:
-                from sqlalchemy import or_
-                from backend.app.models.project import Project
-
-                filters.append(
-                    or_(
-                        Project.name.ilike(f"%{search}%"),
-                        Project.description.ilike(f"%{search}%"),
-                    )
-                )
-            return await self.repo.get_all(
-                page=page, page_size=page_size, filters=filters if filters else None
-            )
-
-        return await self.repo.get_user_projects(
-            user_id, page=page, page_size=page_size, search=search
+    ) -> tuple[list[Project], int]:
+        """List projects belonging to the specified organization."""
+        return await self.repo.get_org_projects(
+            org_id=org_id,
+            page=page,
+            page_size=page_size,
+            search=search,
         )
 
     async def update_project(
         self,
-        project_id: uuid.UUID,
+        *,
+        project: Project,
         user_id: uuid.UUID,
-        role: str,
-        **kwargs,
-    ):
-        """Update a project with access check."""
-        project = await self.get_project(project_id, user_id, role)
+        name: str | None = None,
+        description: str | None = None,
+        language: str | None = None,
+        default_branch: str | None = None,
+        is_archived: bool | None = None,
+        ip_address: str | None = None,
+    ) -> Project:
+        """Update an existing project."""
+        if name is not None and name != project.name:
+            if await self.repo.check_name_exists_in_org(project.organization_id, name):
+                raise ConflictError(f"A project named '{name}' already exists in this organization")
+            project.name = name
 
-        # Filter out None values
-        update_data = {k: v for k, v in kwargs.items() if v is not None}
-        if not update_data:
-            return project
+        if description is not None:
+            project.description = description
+        if language is not None:
+            project.language = language
+        if default_branch is not None:
+            project.default_branch = default_branch
+        if is_archived is not None:
+            project.is_archived = is_archived
 
-        updated = await self.repo.update(project_id, **update_data)
-        await self.audit.log(
+        await self.audit_repo.log_action(
             user_id=user_id,
+            organization_id=project.organization_id,
             action="project.updated",
             resource_type="project",
-            resource_id=str(project_id),
-            metadata=update_data,
+            resource_id=str(project.id),
+            ip_address=ip_address,
         )
-        return updated
+
+        await self.db.commit()
+        return project
 
     async def delete_project(
         self,
-        project_id: uuid.UUID,
+        *,
+        project: Project,
         user_id: uuid.UUID,
-        role: str,
-    ):
-        """Delete (archive) a project."""
-        await self.get_project(project_id, user_id, role)
-        await self.repo.update(project_id, is_archived=True)
-        await self.audit.log(
+        ip_address: str | None = None,
+    ) -> None:
+        """Soft-delete (archive) a project to preserve scan and audit history."""
+        project.is_archived = True
+
+        await self.audit_repo.log_action(
             user_id=user_id,
+            organization_id=project.organization_id,
             action="project.deleted",
             resource_type="project",
-            resource_id=str(project_id),
+            resource_id=str(project.id),
+            ip_address=ip_address,
         )
+
+        await self.db.commit()

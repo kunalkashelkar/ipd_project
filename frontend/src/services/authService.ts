@@ -18,19 +18,25 @@ export const authService = {
     name: string,
     email: string,
     password: string,
-    role: string = 'researcher'
+    organizationName?: string,
+    invitationToken?: string
   ): Promise<AuthResponse> {
     const { data } = await apiClient.post<AuthResponse>('/auth/register', {
       name,
       email,
       password,
-      role,
+      organization_name: organizationName || undefined,
+      invitation_token: invitationToken || undefined,
     });
     return data;
   },
 
   async logout(): Promise<void> {
-    await apiClient.post('/auth/logout');
+    try {
+      await apiClient.post('/auth/logout');
+    } catch {
+      // Best-effort logout revocation
+    }
   },
 
   async refreshToken(refreshToken: string): Promise<{ tokens: { access_token: string; refresh_token: string } }> {
@@ -43,5 +49,24 @@ export const authService = {
   async getMe(): Promise<User> {
     const { data } = await apiClient.get<User>('/auth/me');
     return data;
+  },
+
+  async verifyEmail(token: string): Promise<void> {
+    await apiClient.post('/auth/verify-email', { token });
+  },
+
+  async requestPasswordReset(email: string): Promise<{ message: string; dev_token?: string; reset_url?: string }> {
+    const { data } = await apiClient.post<{ message: string; dev_token?: string; reset_url?: string }>(
+      '/auth/request-password-reset',
+      { email }
+    );
+    return data;
+  },
+
+  async confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+    await apiClient.post('/auth/reset-password', {
+      token,
+      new_password: newPassword,
+    });
   },
 };

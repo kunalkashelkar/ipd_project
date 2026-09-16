@@ -20,17 +20,26 @@ class AnalyticsService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_dashboard_metrics(self, user_id: uuid.UUID, role: str) -> dict:
-        """Get high-level metrics for the dashboard."""
+    async def get_dashboard_metrics(
+        self,
+        organization_id: uuid.UUID | None = None,
+        user_id: uuid.UUID | None = None,
+        role: str | None = None,
+    ) -> dict:
+        """Get high-level metrics for the dashboard strictly scoped to an organization."""
         
-        # Base queries (filtered by user if not admin)
+        # Base queries scoped to tenant organization
         project_query = select(Project).where(Project.is_archived == False)  # noqa: E712
-        scan_query = select(Scan)
-        result_query = select(ScanResult).join(Scan)
+        scan_query = select(Scan).join(Project, Scan.project_id == Project.id)
+        result_query = select(ScanResult).join(Scan, ScanResult.scan_id == Scan.id).join(Project, Scan.project_id == Project.id)
 
-        if role != "admin":
+        if organization_id is not None:
+            project_query = project_query.where(Project.organization_id == organization_id)
+            scan_query = scan_query.where(Project.organization_id == organization_id)
+            result_query = result_query.where(Project.organization_id == organization_id)
+        elif role != "admin" and user_id is not None:
             project_query = project_query.where(Project.owner_id == user_id)
-            scan_query = scan_query.join(Project).where(Project.owner_id == user_id)
+            scan_query = scan_query.where(Project.owner_id == user_id)
             result_query = result_query.where(Project.owner_id == user_id)
 
         # Total projects

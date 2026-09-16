@@ -49,6 +49,13 @@ export const projectService = {
     return project;
   },
 
+  async archiveProject(projectId: string): Promise<Project> {
+    const { data: project } = await apiClient.post<Project>(
+      `/projects/${projectId}/archive`
+    );
+    return project;
+  },
+
   async deleteProject(projectId: string): Promise<void> {
     await apiClient.delete(`/projects/${projectId}`);
   },

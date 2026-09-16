@@ -30,6 +30,7 @@ async def create_scan(
     service = ScanService(db)
     scan = await service.create_scan(
         project_id=body.project_id,
+        source_snapshot_id=body.source_snapshot_id,
         upload_id=body.upload_id,
         repository_id=body.repository_id,
         user_id=current_user.id,

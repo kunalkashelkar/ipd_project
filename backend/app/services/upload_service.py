@@ -15,17 +15,19 @@ from backend.app.core.exceptions import NotFoundError, StorageError, ValidationE
 from backend.app.core.logging import logger
 from backend.app.repositories.upload_repository import UploadRepository
 from backend.app.services.audit_service import AuditService
+from backend.app.storage.service import StorageService
 from backend.app.utils.file_utils import validate_file_extension, validate_file_size
 from backend.app.utils.hashing import compute_sha256
 
 
 class UploadService:
-    """Handles file upload validation, storage, and metadata."""
+    """Handles file upload validation, safe storage via StorageService, and metadata."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, storage: StorageService | None = None):
         self.db = db
         self.repo = UploadRepository(db)
         self.audit = AuditService(db)
+        self.storage = storage or StorageService()
         self.settings = get_settings()
 
     async def upload_file(
@@ -35,14 +37,16 @@ class UploadService:
         project_id: uuid.UUID,
         user_id: uuid.UUID,
     ):
-        """Validate, store, and record a file upload.
+        """Validate, safely store, and record a file upload.
 
         Returns the Upload model instance.
         """
-        original_name = file.filename or "unknown"
+        # Sanitize filename - strip directory traversal
+        raw_name = file.filename or "unknown"
+        clean_name = Path(raw_name).name  # Strips any directory prefixes
 
         # 1. Validate extension
-        validate_file_extension(original_name, self.settings.allowed_extension_list)
+        validate_file_extension(clean_name, self.settings.allowed_extension_list)
 
         # 2. Read file content
         content = await file.read()
@@ -54,15 +58,16 @@ class UploadService:
         sha256_hash = compute_sha256(content)
 
         # 5. Determine file type
-        file_type = "zip" if original_name.lower().endswith(".zip") else "single"
+        ext = Path(clean_name).suffix.lower()
+        file_type = "zip" if ext == ".zip" else "single"
 
-        # 6. Store file
+        # 6. Store file safely via StorageService (UUID generated path)
         upload_id = uuid.uuid4()
-        stored_path = self._store_file(
-            content=content,
+        stored_path = await self.storage.save_upload(
             project_id=project_id,
             upload_id=upload_id,
-            original_name=original_name,
+            file_extension=ext,
+            content=content,
         )
 
         # 7. Create upload record
@@ -70,7 +75,7 @@ class UploadService:
             id=upload_id,
             project_id=project_id,
             user_id=user_id,
-            original_name=original_name,
+            original_name=clean_name,
             stored_path=str(stored_path),
             file_type=file_type,
             size_bytes=len(content),
@@ -85,7 +90,7 @@ class UploadService:
             resource_type="upload",
             resource_id=str(upload.id),
             metadata={
-                "original_name": original_name,
+                "original_name": clean_name,
                 "size_bytes": len(content),
                 "file_type": file_type,
             },
@@ -93,32 +98,12 @@ class UploadService:
 
         logger.info(
             "File uploaded: {name} ({size} bytes) → {path}",
-            name=original_name,
+            name=clean_name,
             size=len(content),
             path=stored_path,
         )
 
         return upload
-
-    def _store_file(
-        self,
-        *,
-        content: bytes,
-        project_id: uuid.UUID,
-        upload_id: uuid.UUID,
-        original_name: str,
-    ) -> Path:
-        """Store the file on disk and return the stored path."""
-        upload_dir = self.settings.upload_path / str(project_id) / str(upload_id)
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        file_path = upload_dir / original_name
-        try:
-            file_path.write_bytes(content)
-        except OSError as exc:
-            raise StorageError(f"Failed to store file: {exc}") from exc
-
-        return file_path
 
     async def get_upload(self, upload_id: uuid.UUID):
         """Get an upload by ID."""
@@ -136,17 +121,11 @@ class UploadService:
         )
 
     async def delete_upload(self, upload_id: uuid.UUID, user_id: uuid.UUID):
-        """Delete an upload and its files."""
+        """Delete an upload and its files via StorageService."""
         upload = await self.get_upload(upload_id)
 
-        # Remove file from disk
-        stored_path = Path(upload.stored_path)
-        if stored_path.exists():
-            stored_path.unlink(missing_ok=True)
-            # Remove parent dirs if empty
-            parent = stored_path.parent
-            if parent.exists() and not any(parent.iterdir()):
-                parent.rmdir()
+        # Remove file from storage abstraction
+        await self.storage.delete_file(upload.stored_path)
 
         await self.repo.delete(upload_id)
         await self.audit.log(

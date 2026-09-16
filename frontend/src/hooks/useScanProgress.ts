@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScanStatus } from '../types';
 import { scanService } from '../services/scanService';
+import { authStorage } from '../services/authStorage';
 
 interface ScanProgressState {
   status: ScanStatus;
@@ -63,15 +64,8 @@ export function useScanProgress(scanId: string | null) {
   const connectWebSocket = useCallback(() => {
     if (!scanId) return;
 
-    // Read token from localStorage
-    let token: string | null = null;
-    try {
-      const raw = localStorage.getItem('auth-storage');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        token = parsed?.state?.token;
-      }
-    } catch { /* ignore */ }
+    // Read token via authStorage abstraction
+    const token = authStorage.getAccessToken();
 
     if (!token) {
       // No token — fall back to polling

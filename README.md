@@ -1,103 +1,164 @@
-# Hybrid XAI Vulnerability Detection
+# Hybrid XAI Vulnerability Detection Platform
 
-> A research framework combining **Program Analysis** (Code Property Graphs, Taint Analysis) with **Graph Neural Networks** and **Explainable AI** for automated software vulnerability detection in C/C++ source code.
-
----
-
-## Overview
-
-This system takes raw C/C++ source code as input and produces:
-
-1. **Vulnerability predictions** — Is this function vulnerable? What type of CWE?
-2. **Explainable evidence** — Which code paths, nodes, and data flows contribute to the prediction?
-3. **Interactive visualizations** — Zoomable graph views with highlighted attack paths and node attributions.
-
-The pipeline fuses classical static analysis (taint tracking, control/data flow) with learned representations (GNN over CPG, CodeBERT embeddings) and explains its decisions using Captum-based attribution methods.
+> A production-grade security platform combining **Program Analysis** (Code Property Graphs, Taint Analysis) with **Graph Neural Networks** and **Explainable AI (XAI)** for automated software vulnerability detection in C/C++ source code.
 
 ---
 
-## Project Structure
+## Architecture Overview (Phase 1 Foundation)
 
 ```
-hybrid-xai-vuln-detection/
-├── backend/
-│   ├── app/
-│   ├── routes/
-│   ├── services/
-│   └── utils/
-├── frontend/
-│   ├── src/
-│   ├── components/
-│   └── pages/
-├── parser/
-│   ├── joern/
-│   ├── preprocessing/
-│   └── graph_builder/
-├── taint_analysis/
-├── feature_engineering/
-├── models/
-│   ├── gnn/
-│   ├── embeddings/
-│   └── training/
-├── explainability/
-├── visualization/
-├── datasets/
-├── experiments/
-├── results/
-├── tests/
-├── docs/
-├── papers/
-├── .env.example
-├── .gitignore
-├── pyproject.toml
-├── requirements.txt
-└── README.md
+                       ┌─────────────────────────┐
+                       │     React 18 + Vite     │
+                       │ (TypeScript + Tailwind) │
+                       └────────────┬────────────┘
+                                    │ Canonical API Client
+                                    ▼
+                       ┌─────────────────────────┐
+                       │      FastAPI Backend    │
+                       │  (Routers, Services,    │
+                       │   Repositories, Guards) │
+                       └─────┬──────┬──────┬─────┘
+                             │      │      │
+              ┌──────────────┘      │      └──────────────┐
+              ▼                     ▼                     ▼
+     ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+     │   PostgreSQL    │   │      Redis      │   │ Storage Service │
+     │  (SQLAlchemy 2  │   │  (Celery Broker │   │ (Hardened Local │
+     │   + Alembic)    │   │  + Cache Store) │   │   Path / S3)    │
+     └─────────────────┘   └────────┬────────┘   └─────────────────┘
+                                    │
+                                    ▼
+                           ┌─────────────────┐
+                           │  Celery Worker  │
+                           │ Infrastructure  │
+                           └─────────────────┘
 ```
 
-### Why Each Folder Exists
+> **Note on Phase 1 Scope**: Phase 1 establishes the engineering, security, database migration, API, shared UI, and infrastructure foundation. In accordance with the project architecture roadmap, the actual scanning engine (Joern CPG extraction, AI model inference, and patch validation) is deferred to Phases 4–6.
 
-#### `backend/` — REST API & Pipeline Orchestration
+---
 
-The FastAPI server that exposes every capability as an API endpoint. It accepts source code uploads, triggers the analysis pipeline, serves predictions, and returns explainability results to the frontend.
+## Key Security Foundations Implemented (Phase 1)
 
-| Subfolder | Purpose |
-|-----------|---------|
-| `app/` | Application factory, startup/shutdown lifecycle, core configuration, middleware |
-| `routes/` | API endpoint definitions grouped by domain (upload, analysis, prediction, reports) |
-| `services/` | Business logic layer — each service orchestrates one pipeline stage (parsing, taint analysis, inference, explanation) |
-| `utils/` | Shared helpers — file handling, response formatting, validation, logging utilities |
+1. **Admin Self-Registration Blocked**: Registration schemas and services strictly reject elevated roles (`admin`, `owner`, `security_lead`). Public registrations default exclusively to standard roles (`security_analyst`, `developer`).
+2. **Path Traversal & Zip-Slip Hardening**: Upload handling utilizes UUID-generated paths (`upload_id/filename.ext`). Archive extraction rigorously validates member paths against `..`, absolute paths, Windows drive specifiers (`C:`), UNC paths (`\\`), and symlink escapes.
+3. **Archive Resource Limits**: Enforces strict configurable thresholds on max upload size (100MB), max extraction size (500MB), and max member files (1,000) to prevent decompression bombs.
+4. **Database Migration Authority**: Removed `Base.metadata.create_all()` from runtime startup; schema definition is managed authoritatively via Alembic migrations.
+5. **Session Isolation**: Frontend token management is encapsulated behind a unified `authStorage` abstraction, preventing arbitrary `localStorage` access across UI components.
 
-#### `frontend/` — Interactive Web Dashboard
+---
 
-A React + Vite single-page application that provides the user interface for uploading code, viewing vulnerability reports, and interacting with graph visualizations.
+## Quickstart — Running with Docker Compose
 
-| Subfolder | Purpose |
-|-----------|---------|
-| `src/` | Application entry point, routing setup, global styles, API client configuration |
-| `components/` | Reusable UI building blocks — graph viewer, code panels, metric cards, modals |
-| `pages/` | Full page views — Dashboard, Upload, Graph Explorer, Explanation View, Reports, Settings |
+The complete environment (PostgreSQL, Redis, FastAPI backend, Celery worker, and Vite frontend) can be launched with Docker Compose:
 
-#### `parser/` — Source Code → Graph Transformation
+```bash
+# 1. Copy the environment configuration
+cp .env.example .env
 
-Converts raw C/C++ source files into structured graph representations (Code Property Graphs) that combine Abstract Syntax Trees, Control Flow Graphs, and Program Dependency Graphs.
+# 2. Start all services
+docker compose up -d
 
-| Subfolder | Purpose |
-|-----------|---------|
-| `joern/` | Joern CLI integration — wrapper scripts, Joern query definitions (`.sc` files), CPG export logic |
-| `preprocessing/` | Code tokenization, normalization, function extraction, dataset cleaning pipelines |
-| `graph_builder/` | Constructs NetworkX / PyG-compatible graph objects from Joern's raw output (nodes, edges, properties) |
+# 3. View logs
+docker compose logs -f
+```
 
-#### `taint_analysis/` — Data Flow Security Analysis
+Services are exposed on:
+- **Frontend Dashboard**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8000`
+- **API Documentation**: `http://localhost:8000/docs`
+- **Health Checks**: `http://localhost:8000/health` and `http://localhost:8000/health/ready`
+- **PostgreSQL**: `localhost:5432`
+- **Redis**: `localhost:6379`
 
-Implements source-to-sink taint tracking over the CPG. Identifies untrusted data sources (e.g., `recv`, `scanf`), sensitive sinks (e.g., `memcpy`, `strcpy`), propagation rules, and sanitization points. Produces **attack paths** — ordered sequences of nodes/edges from source to sink where unsanitized data flows.
+---
 
-#### `feature_engineering/` — Graph Feature Extraction
+## Running Locally for Development
 
-Transforms raw graph structures into numerical feature tensors suitable for GNN input. Extracts:
+### 1. Prerequisites
+- Python 3.11+
+- Node.js 18+ & npm
+- PostgreSQL 15+
+- Redis 7+
 
-- **Node features** — AST node type, code token embeddings, taint labels, call depth, in/out degree
-- **Edge features** — Edge type encoding (AST/CFG/DFG/call), data dependency flags
-- **Graph-level features** — Cyclomatic complexity, function metrics, number of sources/sinks
+### 2. Environment Setup
+```bash
+cp .env.example .env
+# Adjust DATABASE_URL, REDIS_URL, and SECRET_KEY as appropriate
+```
+
+### 3. Backend Setup & Migrations
+```bash
+# Set up Python virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r backend/requirements.txt
+
+# Run Alembic database migrations
+cd backend
+alembic upgrade head
+cd ..
+
+# Start FastAPI development server
+uvicorn backend.app.main:app --reload --port 8000
+```
+
+### 4. Celery Worker
+```bash
+# From workspace root with activated venv:
+celery -A backend.app.workers.celery_app.celery_app worker --loglevel=info
+```
+
+### 5. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## Testing
+
+### Backend Tests (pytest)
+Runs API security, authentication, Zip-Slip, storage isolation, and health endpoint tests:
+```bash
+# From workspace root:
+pytest backend/tests -v
+```
+
+### Frontend Tests (Vitest)
+Runs UI primitives and authentication boundary unit tests:
+```bash
+# From frontend directory:
+cd frontend
+npm test
+```
+
+### Production Build Validation
+```bash
+cd frontend
+npm run build
+```
+
+---
+
+## Phase Roadmap Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **Phase 0** | Architecture Specification & Domain Design | **Completed & Frozen** |
+| **Phase 1** | Foundation & Existing Codebase Reconstruction | **Completed** |
+| **Phase 2** | Organization Context, RBAC & Multi-tenancy | Next |
+| **Phase 3** | Source Ingestion, Snapshots & Preprocessing | Deferred |
+| **Phase 4** | Joern CPG Extraction & Celery Orchestration | Deferred |
+| **Phase 5** | AI Ingestion, GNN/CodeBERT Inference & Findings | Deferred |
+| **Phase 6** | Explainable AI (Captum) & Remediation Verification | Deferred |
+| **Phase 7** | Reports, Analytics & CI/CD Integrations | Deferred |
+| **Phase 8** | Platform Hardening, Reliability & Full E2E | Deferred |
+
 - **Semantic features** — CodeBERT embeddings fused with structural features
 
 #### `models/` — Deep Learning Models
@@ -207,23 +268,69 @@ cd frontend && npm run dev
 
 ---
 
-## Development Roadmap
+## Phase 3 Architecture: Source Ingestion, Provenance & Preprocessing
 
-This project is built incrementally across 10 phases / 28 steps. See the [implementation plan](docs/architecture.md) for full details.
+```
+                   ┌─────────────────────────────────────────────────┐
+                   │             Ingestion Entrypoints               │
+                   │   ZIP Upload │ Files Upload │ Git │ GitHub      │
+                   └────────────────────────┬────────────────────────┘
+                                            │
+                                            ▼
+                   ┌─────────────────────────────────────────────────┐
+                   │               FastAPI API Layer                 │
+                   │  - Authenticate & enforce Org/Project RBAC      │
+                   │  - Stream raw artifact to Object Storage        │
+                   │  - Persist pending SourceSnapshot metadata      │
+                   │  - Enqueue job into Celery default_queue        │
+                   └────────────────────────┬────────────────────────┘
+                                            │
+                                            ▼
+                   ┌─────────────────────────────────────────────────┐
+                   │             Isolated Celery Worker              │
+                   │  - Unique ephemeral scratch directory           │
+                   │  - Safe zip extraction (no Zip-Slip / symlinks) │
+                   │  - File classification (source, noise, binary)  │
+                   │  - Language detection (extension + heuristics)  │
+                   │  - AST & syntax function extraction             │
+                   │  - Deterministic tokenization & normalization   │
+                   │  - Semantic clone duplicate grouping            │
+                   │  - Generate & store JSON manifest in S3         │
+                   │  - Mark SourceSnapshot as READY                 │
+                   └────────────────────────┬────────────────────────┘
+                                            │
+                         ┌──────────────────┴──────────────────┐
+                         ▼                                     ▼
+        ┌──────────────────────────────────┐  ┌──────────────────────────────────┐
+        │       PostgreSQL Metadata        │  │       S3 / MinIO Storage         │
+        │ - Projects & Repositories        │  │ - Original source code artifacts │
+        │ - RepositoryCommits (SHA)        │  │ - Normalized code representations│
+        │ - SourceSnapshots (Immutable)    │  │ - Token stream artifacts         │
+        │ - SourceFiles & Extracted Funcs  │  │ - Reproducible snapshot manifests│
+        └──────────────────────────────────┘  └──────────────────────────────────┘
+```
+
+### Immutable Source Snapshot Invariants
+1. **Provenance Boundary**: Every vulnerability scan strictly references a permanent, immutable `source_snapshot_id`.
+2. **Ready Status Gate**: Scans can only be triggered on snapshots in `ready` status (`pending`, `processing`, or `failed` snapshots are rejected at API and DB layers).
+3. **No Code Execution**: FastAPI and workers treat source code strictly as data; build scripts, hooks, package managers, and setup scripts are never executed.
+4. **Isolated Containment**: Raw, normalized, and tokenized artifacts reside exclusively in object storage (MinIO/S3), keeping PostgreSQL free of source blobs.
+5. **Deterministic Identities**: Extracted functions receive reproducible semantic identifiers (`sha256(snapshot_id:path:name:signature:start_line)[:32]`).
+
+---
+
+## Development Roadmap
 
 | Phase | Focus | Status |
 |-------|-------|--------|
-| 0 | Project Foundation | ✅ Complete |
-| 1 | Parser Module | ⬜ Pending |
-| 2 | Taint Analysis | ⬜ Pending |
-| 3 | Feature Engineering | ⬜ Pending |
-| 4 | GNN Model | ⬜ Pending |
-| 5 | CodeBERT Integration | ⬜ Pending |
-| 6 | Explainability (XAI) | ⬜ Pending |
-| 7 | Backend API | ⬜ Pending |
-| 8 | Frontend Dashboard | ⬜ Pending |
-| 9 | End-to-End Integration | ⬜ Pending |
-| 10 | Research & Experiments | ⬜ Pending |
+| 0 | Project Architecture & Specifications | ✅ Complete |
+| 1 | Infrastructure, Auth Baseline, Security Hardening | ✅ Complete |
+| 2 | Multi-Tenancy, Organizations, Custom RBAC & Audit | ✅ Complete |
+| 3 | Project, Repository, Source Ingestion & Preprocessing | ✅ Complete |
+| 4 | Code Property Graph (CPG) Construction & Joern Pipeline | ⬜ Next Phase |
+| 5 | AI Detection Models (Graph Neural Networks & CodeBERT) | ⬜ Pending |
+| 6 | Explainable AI (XAI) & Autonomous Remediation | ⬜ Pending |
+| 7 | Security Reports, Export Engine & Integrations | ⬜ Pending |
 
 ---
 

@@ -22,10 +22,11 @@ function getStepIndex(status: string, progress: number): number {
 }
 
 export default function ScanProgress() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id?: string; projectId?: string; scanId?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const scanId = searchParams.get('scan_id');
+  const id = params.projectId || params.id;
+  const scanId = params.scanId || searchParams.get('scan_id');
 
   const { status, progress, currentStage, errorMessage } = useScanProgress(scanId);
   const [redirecting, setRedirecting] = useState(false);

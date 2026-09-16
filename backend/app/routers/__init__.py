@@ -2,26 +2,40 @@
 # Routers Package — register all endpoints
 # ============================================================
 
+from backend.app.routers.analytics_router import router as analytics_router
+from backend.app.routers.api_key_router import router as api_key_router
+from backend.app.routers.audit_router import router as audit_router
 from backend.app.routers.auth_router import router as auth_router
 from backend.app.routers.health_router import router as health_router
-from backend.app.routers.project_router import router as project_router
-from backend.app.routers.upload_router import router as upload_router
-from backend.app.routers.scan_router import router as scan_router
-from backend.app.routers.result_router import router as result_router
-from backend.app.routers.report_router import router as report_router
-from backend.app.routers.websocket_router import router as websocket_router
 from backend.app.routers.notification_router import router as notification_router
-from backend.app.routers.analytics_router import router as analytics_router
+from backend.app.routers.organization_router import router as organization_router
+from backend.app.routers.project_router import router as project_router
+from backend.app.routers.report_router import router as report_router
+from backend.app.routers.repository_router import router as repository_router
+from backend.app.routers.result_router import router as result_router
+from backend.app.routers.scan_router import router as scan_router
+from backend.app.routers.snapshot_router import router as snapshot_router
+from backend.app.routers.team_router import invitation_router
+from backend.app.routers.team_router import router as team_router
+from backend.app.routers.upload_router import router as upload_router
+from backend.app.routers.websocket_router import router as websocket_router
 
 __all__ = [
+    "analytics_router",
+    "api_key_router",
+    "audit_router",
     "auth_router",
     "health_router",
-    "project_router",
-    "upload_router",
-    "scan_router",
-    "result_router",
-    "report_router",
-    "websocket_router",
+    "invitation_router",
     "notification_router",
-    "analytics_router",
+    "organization_router",
+    "project_router",
+    "report_router",
+    "repository_router",
+    "result_router",
+    "scan_router",
+    "snapshot_router",
+    "team_router",
+    "upload_router",
+    "websocket_router",
 ]

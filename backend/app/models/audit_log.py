@@ -1,5 +1,5 @@
 # ============================================================
-# Audit Log Model
+# Audit Log Model (Phase 2 Append-Only Security History)
 # ============================================================
 
 from __future__ import annotations
@@ -15,10 +15,13 @@ from backend.app.database.base import Base, UUIDPrimaryKeyMixin
 
 
 class AuditLog(Base, UUIDPrimaryKeyMixin):
-    """Tracks important user and system actions."""
+    """Immutable audit trail of security-sensitive operations."""
 
     __tablename__ = "audit_logs"
 
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )

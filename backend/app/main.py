@@ -23,15 +23,26 @@ from backend.app.core.config import get_settings
 from backend.app.core.logging import logger, setup_logging
 from backend.app.middleware.error_handler import register_exception_handlers
 from backend.app.middleware.request_id import RequestIDMiddleware
-from backend.app.routers import auth_router, health_router
-from backend.app.routers import project_router, upload_router, scan_router
 from backend.app.routers import (
-    result_router,
-    report_router,
-    websocket_router,
-    notification_router,
     analytics_router,
+    api_key_router,
+    audit_router,
+    auth_router,
+    health_router,
+    invitation_router,
+    notification_router,
+    organization_router,
+    project_router,
+    report_router,
+    repository_router,
+    result_router,
+    scan_router,
+    snapshot_router,
+    team_router,
+    upload_router,
+    websocket_router,
 )
+
 
 settings = get_settings()
 
@@ -49,14 +60,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         env=settings.app_env,
     )
 
-    # Initialize database tables if in development
-    if settings.is_development:
-        try:
-            from backend.app.database.init_db import init_db, seed_admin_user
-            await init_db()
-            await seed_admin_user()
-        except Exception as exc:
-            logger.warning("Database initialization skipped/failed: {err}", err=str(exc))
+    # Schema is managed authoritatively via Alembic migrations.
+    # Base.metadata.create_all() has been removed from normal startup.
 
     yield
 
@@ -77,6 +82,7 @@ app = FastAPI(
 )
 
 # ── Middleware ─────────────────────────────────────────────
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -84,29 +90,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(RequestIDMiddleware)
 register_exception_handlers(app)
 
 # ── Routers ────────────────────────────────────────────────
 API_PREFIX = "/api/v1"
 
-# Batch 1
+# Batch 1: Identity & System
 app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(invitation_router, prefix=API_PREFIX)
 app.include_router(health_router)
 
-# Batch 2
+# Batch 2: Organizations & RBAC
+app.include_router(organization_router, prefix=API_PREFIX)
+app.include_router(team_router, prefix=API_PREFIX)
+app.include_router(api_key_router, prefix=API_PREFIX)
+app.include_router(audit_router, prefix=API_PREFIX)
+
+# Batch 3: Projects, Repositories, Snapshots & Scans
 app.include_router(project_router, prefix=API_PREFIX)
+app.include_router(repository_router, prefix=API_PREFIX)
+app.include_router(snapshot_router, prefix=API_PREFIX)
 app.include_router(upload_router, prefix=API_PREFIX)
 app.include_router(scan_router, prefix=API_PREFIX)
 
-# Batch 3
+# Batch 4: Results & Reports
 app.include_router(result_router, prefix=API_PREFIX)
 app.include_router(report_router, prefix=API_PREFIX)
 
-# Batch 4
+# Batch 5: Notifications, Analytics & WebSockets
 app.include_router(websocket_router)
 app.include_router(notification_router, prefix=API_PREFIX)
 app.include_router(analytics_router, prefix=API_PREFIX)
+
 
 
 # ── Root redirect ──────────────────────────────────────────

@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     backend_reload: bool = True
 
     # ── CORS ───────────────────────────────────────────────
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
 
     # ── Database ───────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/vulnscan"
@@ -64,9 +64,17 @@ class Settings(BaseSettings):
     # ── Storage ────────────────────────────────────────────
     storage_backend: str = "local"
     local_storage_path: str = "./storage"
+    s3_endpoint: str | None = "http://localhost:9000"
+    s3_region: str = "us-east-1"
+    s3_access_key: str = "minioadmin"
+    s3_secret_key: str = "minioadmin"
+    s3_bucket: str = "vulnscan"
+    s3_secure: bool = False
 
-    # ── Uploads ────────────────────────────────────────────
+    # ── Uploads & Archives ─────────────────────────────────
     max_upload_size_mb: int = 200
+    max_extraction_size_mb: int = 500
+    max_archive_files: int = 10000
     allowed_upload_extensions: str = ".zip,.jar,.java,.py,.js,.ts,.c,.cpp,.h,.hpp"
 
     # ── AI & Pipeline ──────────────────────────────────────
@@ -103,6 +111,11 @@ class Settings(BaseSettings):
     def max_upload_size_bytes(self) -> int:
         """Convert MB limit to bytes."""
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def max_extraction_size_bytes(self) -> int:
+        """Convert extraction MB limit to bytes."""
+        return self.max_extraction_size_mb * 1024 * 1024
 
     @property
     def storage_path(self) -> Path:

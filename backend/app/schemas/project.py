@@ -1,5 +1,5 @@
 # ============================================================
-# Project Schemas
+# Project Schemas (Phase 2 Multi-Tenant)
 # ============================================================
 
 from __future__ import annotations
@@ -7,11 +7,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreate(BaseModel):
-    """Create a new project."""
+    """Create a new project within an organization."""
 
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
@@ -32,7 +32,10 @@ class ProjectUpdate(BaseModel):
 class ProjectResponse(BaseModel):
     """Project response data."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
+    organization_id: uuid.UUID | None = None
     name: str
     description: str | None = None
     language: str | None = None
@@ -41,5 +44,3 @@ class ProjectResponse(BaseModel):
     is_archived: bool
     created_at: datetime
     updated_at: datetime
-
-    model_config = {"from_attributes": True}

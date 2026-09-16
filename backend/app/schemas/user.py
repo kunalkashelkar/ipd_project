@@ -17,6 +17,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     role: str
+    active_organization_role: str | None = None
     status: str
     created_at: datetime
     last_login_at: datetime | None = None

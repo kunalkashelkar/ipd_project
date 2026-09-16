@@ -96,7 +96,16 @@ async def require_project_access(
     if current_user.role == "admin":
         return current_user
 
-    if project.owner_id != current_user.id:
-        raise AuthorizationError("You do not have access to this project")
+    # Multi-tenant organization check: check if user is an active member of the project's organization
+    if project.organization_id is not None:
+        from backend.app.repositories.phase2_repositories import MembershipRepository
 
-    return current_user
+        member_repo = MembershipRepository(db)
+        membership = await member_repo.get_membership(project.organization_id, current_user.id)
+        if membership is not None and membership.status == "active":
+            return current_user
+
+    if project.owner_id == current_user.id:
+        return current_user
+
+    raise AuthorizationError("You do not have access to this project")
