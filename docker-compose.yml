@@ -66,6 +66,8 @@ services:
       - S3_SECURE=false
     volumes:
       - ./backend:/app/backend
+      - ./parser:/app/parser
+      - ./taint_analysis:/app/taint_analysis
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +96,8 @@ services:
       - S3_SECURE=false
     volumes:
       - ./backend:/app/backend
+      - ./parser:/app/parser
+      - ./taint_analysis:/app/taint_analysis
     depends_on:
       postgres:
         condition: service_healthy

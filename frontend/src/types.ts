@@ -124,29 +124,120 @@ export interface Upload {
 // ── Scans ────────────────────────────────────────────────────
 
 export type ScanStatus =
+  | 'pending'
   | 'queued'
+  | 'preparing'
+  | 'checkout'
   | 'preprocessing'
-  | 'ai_running'
-  | 'storing_results'
+  | 'static_analysis'
+  | 'graph_processing'
+  | 'ai_analysis'
+  | 'post_processing'
   | 'completed'
   | 'failed'
   | 'cancelled'
+  | 'timed_out'
+  | 'retrying'
   | 'running';
 
 export interface Scan {
   id: string;
   project_id: string;
+  organization_id?: string | null;
   upload_id: string | null;
   repository_id: string | null;
   source_snapshot_id?: string | null;
-  user_id: string;
+  user_id?: string;
   status: ScanStatus;
   progress: number;
   current_stage: string | null;
+  stage_attempt?: number;
+  retry_count?: number;
+  timeout_seconds?: number;
+  worker_id?: string | null;
+  heartbeat_at?: string | null;
+  failure_code?: string | null;
+  failure_reason?: string | null;
   error_message: string | null;
   started_at: string | null;
   completed_at: string | null;
+  cancelled_at?: string | null;
+  config?: Record<string, any> | null;
+  ai_model_version?: string | null;
   created_at: string;
+}
+
+export interface ScanStatusInfo {
+  id: string;
+  status: ScanStatus;
+  progress: number;
+  current_stage: string | null;
+  failure_code?: string | null;
+  failure_reason?: string | null;
+  cancelled_at?: string | null;
+  error_message?: string | null;
+}
+
+export interface ScanStageRun {
+  id: string;
+  scan_id: string;
+  stage: string;
+  attempt: number;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  worker_id?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  stage_metadata?: Record<string, any> | null;
+  created_at: string;
+}
+
+export interface AnalysisArtifact {
+  id: string;
+  scan_id: string;
+  source_snapshot_id: string;
+  artifact_type: string;
+  schema_version: string;
+  artifact_uri: string;
+  content_hash: string;
+  size_bytes: number;
+  status: string;
+  tool_name?: string | null;
+  tool_version?: string | null;
+  node_count: number;
+  edge_count: number;
+  artifact_metadata?: Record<string, any> | null;
+  created_at: string;
+  completed_at?: string | null;
+  error_message?: string | null;
+}
+
+export interface TaintPathEvidence {
+  path_id: string;
+  source_id: string;
+  sink_id: string;
+  length: number;
+  nodes: string[];
+  risk_score: number;
+  source_file?: string | null;
+  source_line?: number | null;
+  sink_file?: string | null;
+  sink_line?: number | null;
+}
+
+export interface TaintEvidenceResponse {
+  status: string;
+  schema_version?: string;
+  artifact_id?: string;
+  scan_id?: string;
+  source_count: number;
+  sink_count: number;
+  sanitizer_count?: number;
+  attack_path_count?: number;
+  paths: TaintPathEvidence[];
+  message?: string;
 }
 
 // ── Phase 3: Repositories & VCS ──────────────────────────────
@@ -269,15 +360,6 @@ export interface FunctionModel {
   created_at: string;
 }
 
-
-export interface ScanStatusInfo {
-  id: string;
-  status: ScanStatus;
-  progress: number;
-  current_stage: string | null;
-  error_message: string | null;
-}
-
 // ── Scan Results (Vulnerabilities) ───────────────────────────
 
 export type VulnerabilitySeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'SAFE';
@@ -350,6 +432,7 @@ export interface DashboardMetrics {
   severity_breakdown: Record<string, number>;
   recent_scans: Scan[];
   scan_success_rate?: number;
+  vulnerabilities_by_cwe?: Array<{ cwe_id: string; count: number }>;
 }
 
 export interface AnalyticsSummary {
@@ -380,3 +463,7 @@ export interface PaginatedResponse<T> {
   data: PaginatedData<T>;
   message: string;
 }
+
+// ── Phase 5 Findings ─────────────────────────────────────────
+export * from './types/finding';
+

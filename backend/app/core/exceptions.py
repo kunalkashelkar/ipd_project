@@ -38,7 +38,14 @@ class AuthorizationError(AppError):
     message = "Insufficient permissions"
 
 
-# ── Validation ─────────────────────────────────────────────
+# ── Validation / Bad Request ───────────────────────────────
+
+
+class BadRequestError(AppError):
+    """Client request is invalid or unsupported."""
+
+    status_code = 400
+    message = "Bad request"
 
 
 class ValidationError(AppError):

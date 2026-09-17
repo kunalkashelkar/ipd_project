@@ -42,7 +42,7 @@ export default function Dashboard() {
     {
       title: 'Total Projects',
       value: metrics?.total_projects?.toString() ?? '0',
-      caption: 'Active repositories',
+      caption: 'Non-archived projects in this workspace',
       icon: FolderOpen,
       iconColor: 'text-blue-400 bg-blue-500/10',
     },
@@ -196,9 +196,9 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="h-40 flex flex-col items-center justify-center bg-muted/10 m-4 mt-0 rounded-md border border-dashed border-border p-4 text-center">
               <Activity className="w-6 h-6 opacity-30 mb-1.5 text-muted-foreground" />
-              <p className="text-xs font-semibold text-foreground">No Timeline Records</p>
+              <p className="text-xs font-semibold text-foreground">No Historical Risk Trend</p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Vulnerability trends track over time once project scans complete.
+                Historical risk timelines will be available with Phase 7 analytics.
               </p>
             </CardContent>
           </Card>
@@ -233,12 +233,29 @@ export default function Dashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Common Weaknesses (CWE)</CardTitle>
             </CardHeader>
-            <CardContent className="h-40 flex flex-col items-center justify-center bg-muted/10 m-4 mt-0 rounded-md border border-dashed border-border p-4 text-center">
-              <FolderOpen className="w-6 h-6 opacity-30 mb-1.5 text-muted-foreground" />
-              <p className="text-xs font-semibold text-foreground">No CWE Attributions</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Weakness taxonomies will populate after static & AI inference passes.
-              </p>
+            <CardContent className="h-40 flex flex-col items-center justify-center bg-muted/10 m-4 mt-0 rounded-md border border-dashed border-border p-4 text-center overflow-y-auto">
+              {metrics?.vulnerabilities_by_cwe && metrics.vulnerabilities_by_cwe.length > 0 ? (
+                <div className="space-y-1.5 w-full">
+                  {metrics.vulnerabilities_by_cwe.map((item) => (
+                    <div key={item.cwe_id} className="text-xs flex justify-between items-center px-3">
+                      <span className="font-mono font-medium text-foreground bg-muted/40 px-1.5 py-0.5 rounded text-[11px]">
+                        {item.cwe_id}
+                      </span>
+                      <span className="font-mono text-muted-foreground text-xs">
+                        {item.count} {item.count === 1 ? 'finding' : 'findings'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <FolderOpen className="w-6 h-6 opacity-30 mb-1.5 text-muted-foreground" />
+                  <p className="text-xs font-semibold text-foreground">No CWE Attributions</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    No Common Weakness Enumerations mapped to active findings.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

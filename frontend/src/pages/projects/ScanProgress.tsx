@@ -1,25 +1,105 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, Database, Network, Zap, ShieldCheck, AlertCircle } from 'lucide-react';
+// ============================================================
+// ScanProgress.tsx — Phase 4 Real-Time Scan Pipeline Progress
+// ============================================================
+
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  Check,
+  Loader2,
+  AlertCircle,
+  XCircle,
+  Clock,
+  ArrowRight,
+  Shield,
+  Layers,
+  Network,
+  Cpu,
+  FileCode2,
+  FolderGit2,
+  StopCircle,
+} from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import { useScanProgress } from '../../hooks/useScanProgress';
+import { scanService } from '../../services/scanService';
+import toast from 'react-hot-toast';
 
-const SCAN_STEPS = [
-  { id: 'parse', label: 'Parsing Source Code', icon: Database, stages: ['queued', 'preprocessing'] },
-  { id: 'taint', label: 'Extracting Data Flow & Taint Paths', icon: Network, stages: ['preprocessing'] },
-  { id: 'gnn', label: 'GNN Vulnerability Classification', icon: Zap, stages: ['ai_running'] },
-  { id: 'llm', label: 'Generating Results & Report', icon: ShieldCheck, stages: ['storing_results', 'completed'] },
+interface PipelineStageDef {
+  id: string;
+  name: string;
+  description: string;
+  icon: any;
+  isAiReserved?: boolean;
+}
+
+const PIPELINE_STAGES: PipelineStageDef[] = [
+  {
+    id: 'created',
+    name: 'Created',
+    description: 'Scan record initialized and bound to immutable snapshot.',
+    icon: Shield,
+  },
+  {
+    id: 'queued',
+    name: 'Queued',
+    description: 'Enqueued in Celery worker task backlog.',
+    icon: Clock,
+  },
+  {
+    id: 'preparing',
+    name: 'Preparing',
+    description: 'Setting up isolated sandbox execution environment.',
+    icon: FolderGit2,
+  },
+  {
+    id: 'checkout',
+    name: 'Checkout',
+    description: 'Retrieving immutable source snapshot archive from storage.',
+    icon: FileCode2,
+  },
+  {
+    id: 'preprocessing',
+    name: 'Preprocessing',
+    description: 'Discovering files, validating manifests, and checking encodings.',
+    icon: Layers,
+  },
+  {
+    id: 'static_analysis',
+    name: 'Static Analysis',
+    description: 'Executing static analysis engine and Joern CLI parsers.',
+    icon: Cpu,
+  },
+  {
+    id: 'graph_processing',
+    name: 'Graph Processing',
+    description: 'Generating canonical AST, CFG, PDG, CPG, and Call Graph.',
+    icon: Network,
+  },
+  {
+    id: 'ai_analysis',
+    name: 'AI Analysis',
+    description: 'Deep learning classification (Phase 5 reserved — not configured).',
+    icon: Cpu,
+    isAiReserved: true,
+  },
+  {
+    id: 'post_processing',
+    name: 'Post-Processing',
+    description: 'Propagating taint and extracting attack path evidence.',
+    icon: Layers,
+  },
+  {
+    id: 'completed',
+    name: 'Completed',
+    description: 'All canonical graph artifacts and taint evidence stored.',
+    icon: Check,
+  },
 ];
 
-function getStepIndex(status: string, progress: number): number {
-  if (status === 'completed') return SCAN_STEPS.length;
-  if (status === 'storing_results') return 3;
-  if (status === 'ai_running') return 2;
-  if (status === 'preprocessing') return progress > 15 ? 1 : 0;
-  return 0;
-}
+const STAGE_ORDER = PIPELINE_STAGES.map((s) => s.id);
 
 export default function ScanProgress() {
   const params = useParams<{ id?: string; projectId?: string; scanId?: string }>();
@@ -29,22 +109,35 @@ export default function ScanProgress() {
   const scanId = params.scanId || searchParams.get('scan_id');
 
   const { status, progress, currentStage, errorMessage } = useScanProgress(scanId);
-  const [redirecting, setRedirecting] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  const currentStepIndex = getStepIndex(status, progress);
-  const progressPercentage = Math.min(progress, 100);
-  const isFailed = status === 'failed' || status === 'cancelled';
+  // Determine stage progression index
+  const activeStageId = (currentStage || status || 'created').toLowerCase();
+  let currentIndex = STAGE_ORDER.indexOf(activeStageId);
+  if (currentIndex === -1) {
+    if (status === 'completed') currentIndex = STAGE_ORDER.length - 1;
+    else if (status === 'running') currentIndex = 5;
+    else currentIndex = 1;
+  }
+
   const isCompleted = status === 'completed';
+  const isFailed = status === 'failed';
+  const isCancelled = status === 'cancelled';
+  const isTimedOut = status === 'timed_out';
+  const isTerminal = isCompleted || isFailed || isCancelled || isTimedOut;
 
-  useEffect(() => {
-    if (isCompleted && !redirecting) {
-      setRedirecting(true);
-      const timeout = setTimeout(() => {
-        navigate(`/projects/${id}/results?scan_id=${scanId}`);
-      }, 1500);
-      return () => clearTimeout(timeout);
+  const handleCancel = useCallback(async () => {
+    if (!scanId || isCancelling) return;
+    setIsCancelling(true);
+    try {
+      await scanService.cancelScan(scanId);
+      toast.success('Scan cancellation requested.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to cancel scan.');
+    } finally {
+      setIsCancelling(false);
     }
-  }, [isCompleted, id, scanId, navigate, redirecting]);
+  }, [scanId, isCancelling]);
 
   if (!scanId) {
     return (
@@ -59,107 +152,235 @@ export default function ScanProgress() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-2xl mx-auto py-12">
-      <div className="text-center mb-12">
-        <h1 className="text-3xl font-bold font-display text-foreground mb-4">Pipeline Execution in Progress</h1>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          {currentStage || 'The hybrid XAI vulnerability detection engine is currently analyzing your codebase.'}
-        </p>
+    <div className="max-w-4xl mx-auto py-8 px-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold font-display text-foreground">
+              Scan Pipeline Execution
+            </h1>
+            <Badge
+              variant={
+                isCompleted
+                  ? 'safe'
+                  : isFailed
+                  ? 'destructive'
+                  : isCancelled || isTimedOut
+                  ? 'warning'
+                  : 'default'
+              }
+            >
+              {status.toUpperCase().replace('_', ' ')}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground font-mono mt-1">
+            Scan ID: {scanId}
+          </p>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
+          {!isTerminal && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="text-destructive hover:bg-destructive/10 border-destructive/30"
+            >
+              <StopCircle className="w-4 h-4 mr-1.5" />
+              {isCancelling ? 'Cancelling...' : 'Cancel Scan'}
+            </Button>
+          )}
+
+          {isCompleted && (
+            <Button
+              size="sm"
+              onClick={() => navigate(`/projects/${id}/results?scan_id=${scanId}`)}
+              className="gap-1.5 shadow-sm"
+            >
+              View Analysis Results <ArrowRight className="w-4 h-4" />
+            </Button>
+          )}
+
+          <Link to={`/projects/${id}`}>
+            <Button variant="ghost" size="sm">
+              Back to Project
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <Card className="w-full p-8 relative overflow-hidden bg-card/50">
-
-        {/* Progress bar */}
-        <div className="absolute top-0 left-0 h-1 bg-muted w-full">
+      {/* Main Execution Card */}
+      <Card className="p-6 border-border relative overflow-hidden bg-card/60">
+        {/* Top Continuous Progress Bar */}
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-muted">
           <motion.div
-            className={`h-full ${isFailed ? 'bg-destructive' : 'bg-primary'}`}
-            initial={{ width: 0 }}
-            animate={{ width: `${progressPercentage}%` }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
+            className={`h-full ${
+              isCompleted
+                ? 'bg-emerald-500'
+                : isFailed
+                ? 'bg-destructive'
+                : isCancelled || isTimedOut
+                ? 'bg-amber-500'
+                : 'bg-primary'
+            }`}
+            initial={{ width: '0%' }}
+            animate={{ width: `${Math.min(100, Math.max(5, progress))}%` }}
+            transition={{ duration: 0.4 }}
           />
         </div>
 
-        <div className="flex items-center justify-between mb-6 mt-2">
-          <span className="text-sm text-muted-foreground">
-            {isFailed ? 'Scan Failed' : `${Math.round(progressPercentage)}% Complete`}
+        {/* Status Banner */}
+        <div className="flex items-center justify-between py-2 border-b border-border/60 mb-6">
+          <div className="flex items-center gap-2 text-sm">
+            {!isTerminal ? (
+              <>
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                <span className="text-foreground font-medium">
+                  Current Stage:{' '}
+                  <span className="text-primary capitalize">
+                    {activeStageId.replace('_', ' ')}
+                  </span>
+                </span>
+              </>
+            ) : isCompleted ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span className="text-emerald-400 font-medium">
+                  Static Analysis & Graph Pipeline Completed Successfully
+                </span>
+              </>
+            ) : isCancelled ? (
+              <>
+                <StopCircle className="w-4 h-4 text-amber-400" />
+                <span className="text-amber-400 font-medium">
+                  Scan was cancelled by user request
+                </span>
+              </>
+            ) : isTimedOut ? (
+              <>
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span className="text-amber-400 font-medium">
+                  Scan execution timed out
+                </span>
+              </>
+            ) : (
+              <>
+                <XCircle className="w-4 h-4 text-destructive" />
+                <span className="text-destructive font-medium">
+                  Scan Execution Failed
+                </span>
+              </>
+            )}
+          </div>
+          <span className="text-sm font-semibold text-foreground">
+            {Math.round(progress)}%
           </span>
         </div>
 
-        <div className="space-y-6">
-          {SCAN_STEPS.map((step, index) => {
-            const isStepCompleted = index < currentStepIndex;
-            const isCurrent = index === currentStepIndex && !isFailed && !isCompleted;
-            const isPending = index > currentStepIndex;
+        {/* Error diagnostics banner */}
+        {errorMessage && isTerminal && !isCompleted && (
+          <div className="mb-6 p-3.5 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-semibold">Execution Error: </span>
+              {errorMessage}
+            </div>
+          </div>
+        )}
+
+        {/* Real 10-Stage Pipeline Timeline */}
+        <div className="space-y-3">
+          {PIPELINE_STAGES.map((stage, idx) => {
+            const isStageDone = isCompleted || idx < currentIndex;
+            const isStageActive = idx === currentIndex && !isTerminal;
+            const isStageFailed = idx === currentIndex && isFailed;
 
             return (
               <div
-                key={step.id}
-                className={`flex items-center gap-4 transition-all duration-500 ${isPending ? 'opacity-40' : 'opacity-100'} ${isCurrent ? 'scale-105' : 'scale-100'}`}
+                key={stage.id}
+                className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                  isStageActive
+                    ? 'border-primary/50 bg-primary/5 shadow-sm'
+                    : isStageDone
+                    ? 'border-border/40 bg-card/40'
+                    : isStageFailed
+                    ? 'border-destructive/40 bg-destructive/5'
+                    : 'border-border/30 bg-muted/10 opacity-50'
+                }`}
               >
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors
-                  ${isStepCompleted ? 'bg-emerald-500/20 text-emerald-500' :
-                    isCurrent ? 'bg-primary/20 text-primary ring-2 ring-primary ring-offset-2 ring-offset-background' :
-                      'bg-muted text-muted-foreground'}
-                `}>
-                  {isStepCompleted ? (
-                    <Check className="w-5 h-5" />
-                  ) : isCurrent ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <step.icon className="w-5 h-5" />
-                  )}
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {/* Step status circle */}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold ${
+                      isStageDone
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                        : isStageActive
+                        ? 'bg-primary/20 text-primary border border-primary animate-pulse'
+                        : isStageFailed
+                        ? 'bg-destructive/20 text-destructive border border-destructive'
+                        : 'bg-muted text-muted-foreground border border-border'
+                    }`}
+                  >
+                    {isStageDone ? (
+                      <Check className="w-4 h-4" />
+                    ) : isStageActive ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : isStageFailed ? (
+                      <XCircle className="w-4 h-4" />
+                    ) : (
+                      <span>{idx + 1}</span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-sm font-medium ${
+                          isStageActive
+                            ? 'text-primary font-semibold'
+                            : isStageDone
+                            ? 'text-foreground'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        {stage.name}
+                      </span>
+
+                      {stage.isAiReserved && (
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border font-medium">
+                          Phase 5 Reserved (Not Configured)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {stage.description}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex-1">
-                  <h3 className={`font-medium ${isCurrent ? 'text-primary' : isStepCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {step.label}
-                  </h3>
-                  <AnimatePresence>
-                    {isCurrent && currentStage && (
-                      <motion.p
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="text-sm text-muted-foreground mt-1"
-                      >
-                        {currentStage}
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
+                {/* State Tag */}
+                <div className="shrink-0 text-xs">
+                  {isStageDone ? (
+                    <span className="text-emerald-400 font-medium">Completed</span>
+                  ) : isStageActive ? (
+                    <span className="text-primary font-medium flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                      In Progress
+                    </span>
+                  ) : isStageFailed ? (
+                    <span className="text-destructive font-medium">Failed</span>
+                  ) : (
+                    <span className="text-muted-foreground">Pending</span>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
       </Card>
-
-      {isFailed && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 text-center"
-        >
-          <p className="text-destructive flex items-center justify-center gap-2 font-medium">
-            <AlertCircle className="w-5 h-5" />
-            {errorMessage || 'Scan failed. Please try again.'}
-          </p>
-          <Button className="mt-4" variant="outline" onClick={() => navigate(`/projects/${id}`)}>
-            Back to Project
-          </Button>
-        </motion.div>
-      )}
-
-      {isCompleted && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 text-emerald-500 flex items-center gap-2 font-medium"
-        >
-          <Check className="w-5 h-5" />
-          Pipeline Complete. Redirecting to workspace...
-        </motion.div>
-      )}
     </div>
   );
 }

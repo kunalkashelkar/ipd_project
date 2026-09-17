@@ -60,7 +60,10 @@ nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
+coverage/
 htmlcov/
+playwright-report/
+test-results/
 .tox/
 .nox/
 .hypothesis/
@@ -89,11 +92,17 @@ logs/*
 *.log
 *.tmp
 *.temp
+tmp/
+temp/
 storage_test/
 scratch/
+minio_data/
+postgres_data/
+redis_data/
+celerybeat-schedule*
 
 # ==========================================
-# Database & SQLite
+# Database & SQLite & Dumps
 # ==========================================
 *.db
 *.sqlite
@@ -101,6 +110,9 @@ scratch/
 *.db-journal
 *.db-wal
 *.db-shm
+*.dump
+*.sql
+
 
 # ==========================================
 # Machine Learning Artifacts & Checkpoints

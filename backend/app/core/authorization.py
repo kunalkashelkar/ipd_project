@@ -26,6 +26,8 @@ from backend.app.models.organization import Organization, OrganizationMember
 from backend.app.models.project import Project
 from backend.app.models.rbac import Role, RolePermission
 from backend.app.models.repository import Repository
+from backend.app.models.scan import Scan
+from backend.app.models.finding import Finding
 from backend.app.models.session import UserSession
 from backend.app.models.user import User
 
@@ -254,6 +256,15 @@ async def require_project_access(
         raise NotFoundError("Project not found")
 
     project, member = row
+
+    # Role 'owner' has all permissions by definition; otherwise require project.read
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "project.read" not in granted:
+            raise AuthorizationError(
+                f"Permission denied: Action requires 'project.read' in organization '{member.organization.name if hasattr(member, 'organization') and member.organization else ''}'"
+            )
+
     return project, member
 
 
@@ -291,4 +302,107 @@ async def require_repository_access(
         raise NotFoundError("Repository not found")
 
     repo, project, member = row
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "repository.read" not in granted:
+            raise AuthorizationError(
+                f"Permission denied: Action requires 'repository.read' in organization '{member.organization.name if hasattr(member, 'organization') and member.organization else ''}'"
+            )
+
     return repo, project, member
+
+
+async def require_scan_access(
+    scan_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[Scan, Project, OrganizationMember]:
+    """Tenant-isolated scan resolution:
+
+    Resolves scan -> project -> organization -> current user active membership.
+    UUID knowledge of another tenant's scan returns 404 to avoid leaking existence.
+    Checks scan.read permission on member role.
+    """
+    stmt = (
+        select(Scan, Project, OrganizationMember)
+        .join(Project, Scan.project_id == Project.id)
+        .join(Organization, Project.organization_id == Organization.id)
+        .join(
+            OrganizationMember,
+            (OrganizationMember.organization_id == Organization.id)
+            & (OrganizationMember.user_id == current_user.id)
+            & (OrganizationMember.status == "active"),
+        )
+        .options(
+            selectinload(OrganizationMember.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission)
+        )
+        .where(Scan.id == scan_id)
+    )
+
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if row is None:
+        raise NotFoundError("Scan not found")
+
+    scan, project, member = row
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "scan.read" not in granted:
+            raise AuthorizationError(
+                f"Permission denied: Action requires 'scan.read' in organization '{member.organization.name if hasattr(member, 'organization') and member.organization else ''}'"
+            )
+
+    return scan, project, member
+
+
+async def require_finding_access(
+    finding_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[Finding, Project, OrganizationMember]:
+    """Tenant-isolated finding resolution:
+
+    Resolves finding -> project -> organization -> current user active membership.
+    UUID knowledge of another tenant's finding returns 404 to avoid leaking existence.
+    Checks finding.read permission on member role.
+    """
+    stmt = (
+        select(Finding, Project, OrganizationMember)
+        .join(Project, Finding.project_id == Project.id)
+        .join(Organization, Project.organization_id == Organization.id)
+        .join(
+            OrganizationMember,
+            (OrganizationMember.organization_id == Organization.id)
+            & (OrganizationMember.user_id == current_user.id)
+            & (OrganizationMember.status == "active"),
+        )
+        .options(
+            selectinload(OrganizationMember.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission)
+        )
+        .where(Finding.id == finding_id)
+    )
+
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if row is None:
+        raise NotFoundError("Finding not found")
+
+    finding, project, member = row
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "finding.read" not in granted:
+            raise AuthorizationError(
+                f"Permission denied: Action requires 'finding.read' in organization '{member.organization.name if hasattr(member, 'organization') and member.organization else ''}'"
+            )
+
+    return finding, project, member
+

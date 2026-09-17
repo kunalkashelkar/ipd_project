@@ -6,6 +6,7 @@ from backend.app.routers.analytics_router import router as analytics_router
 from backend.app.routers.api_key_router import router as api_key_router
 from backend.app.routers.audit_router import router as audit_router
 from backend.app.routers.auth_router import router as auth_router
+from backend.app.routers.finding_router import router as finding_router
 from backend.app.routers.health_router import router as health_router
 from backend.app.routers.notification_router import router as notification_router
 from backend.app.routers.organization_router import router as organization_router
@@ -25,6 +26,7 @@ __all__ = [
     "api_key_router",
     "audit_router",
     "auth_router",
+    "finding_router",
     "health_router",
     "invitation_router",
     "notification_router",

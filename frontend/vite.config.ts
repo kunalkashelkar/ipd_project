@@ -23,6 +23,11 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
       },
+      '/ws': {
+        target: backendTarget,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   test: {

@@ -19,6 +19,9 @@ import {
   GitCommit,
   AlertCircle,
   Plus,
+  Network,
+  CheckCircle2,
+  Lock,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { snapshotService } from '../../services/snapshotService';
@@ -254,30 +257,34 @@ export default function ScanConfig() {
               {[
                 {
                   id: 'static',
-                  label: 'Static Code & Preprocessing Analysis',
-                  desc: 'Deterministic tokenization, AST extraction, and function indexing.',
+                  label: 'Static Code & Canonical Graph Pipeline',
+                  desc: 'AST, CFG, PDG, CPG, and Call Graph generation with cryptographic checksums.',
                   icon: Shield,
+                  statusLabel: 'Included (Phase 4)',
+                  active: true,
+                },
+                {
+                  id: 'taint',
+                  label: 'Data Flow & Taint Analysis Engine',
+                  desc: 'Source, sink, and sanitizer detection with attack path evidence extraction.',
+                  icon: Network,
+                  statusLabel: 'Included (Phase 4)',
                   active: true,
                 },
                 {
                   id: 'ai',
                   label: 'AI Vulnerability Detection',
-                  desc: 'Multi-layer CodeBERT & Graph Neural Network classification.',
+                  desc: 'Deep learning vulnerability classification is reserved for Phase 5.',
                   icon: ScanEye,
-                  active: true,
-                },
-                {
-                  id: 'report',
-                  label: 'Security Report Generation',
-                  desc: 'Compile scan findings into structured JSON/PDF report upon completion.',
-                  icon: FileText,
-                  active: true,
+                  statusLabel: 'Phase 5 Reserved',
+                  active: false,
                 },
                 {
                   id: 'explain',
-                  label: 'Explainability (SHAP & GNN Explainer)',
-                  desc: 'Generate graph node heatmaps. (Roadmap: Phase 6)',
+                  label: 'Explainability/XAI',
+                  desc: 'Node feature attribution and saliency maps. (Roadmap: Phase 6)',
                   icon: Zap,
+                  statusLabel: 'Planned (Phase 6)',
                   active: false,
                 },
                 {
@@ -285,34 +292,37 @@ export default function ScanConfig() {
                   label: 'Autonomous Remediation',
                   desc: 'Automated patch generation and validation. (Roadmap: Phase 6)',
                   icon: Zap,
+                  statusLabel: 'Planned (Phase 6)',
                   active: false,
                 },
               ].map((opt) => (
                 <div
                   key={opt.id}
                   className={`flex items-start gap-3 p-2.5 rounded-md border transition-colors ${
-                    opt.active ? 'border-border bg-card' : 'border-border/60 bg-muted/20 opacity-70'
+                    opt.active ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-border/60 bg-muted/20 opacity-70'
                   }`}
                 >
                   <div className="pt-0.5">
-                    <input
-                      type="checkbox"
-                      className="w-3.5 h-3.5 accent-primary rounded text-primary focus:ring-primary focus:ring-offset-background"
-                      checked={opt.active}
-                      disabled={!opt.active}
-                      readOnly
-                    />
+                    {opt.active ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground/60" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-xs text-foreground flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <opt.icon className="w-3.5 h-3.5 text-muted-foreground" /> {opt.label}
                       </span>
-                      {opt.active ? (
-                        <span className="text-[10px] text-emerald-400 font-normal">Active in Pipeline</span>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground font-normal">Planned</span>
-                      )}
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded border ${
+                          opt.active
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-medium'
+                            : 'border-border/40 bg-muted/30 text-muted-foreground'
+                        }`}
+                      >
+                        {opt.statusLabel}
+                      </span>
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">{opt.desc}</div>
                   </div>

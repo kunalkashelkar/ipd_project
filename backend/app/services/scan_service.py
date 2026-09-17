@@ -1,18 +1,33 @@
 # ============================================================
-# Scan Service
+# Scan Service — Phase 4 Core Service Layer
 # ============================================================
 
 from __future__ import annotations
 
+import json
 import uuid
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from backend.app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from backend.app.core.exceptions import (
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
+from backend.app.models.analysis_artifact import AnalysisArtifact
+from backend.app.models.project import Project
+from backend.app.models.scan import Scan, ScanEvent, ScanStageRun
+from backend.app.models.source_snapshot import SourceSnapshot
 from backend.app.repositories.scan_repository import ScanRepository
 from backend.app.repositories.upload_repository import UploadRepository
 from backend.app.services.audit_service import AuditService
+from backend.app.services.scan_lifecycle.lifecycle_service import ScanLifecycleService
+from backend.app.services.scan_lifecycle.state_machine import ScanStage
+from backend.app.storage.service import StorageService
 
 
 class ScanService:
@@ -23,6 +38,8 @@ class ScanService:
         self.scan_repo = ScanRepository(db)
         self.upload_repo = UploadRepository(db)
         self.audit = AuditService(db)
+        self.lifecycle = ScanLifecycleService(db)
+        self.storage = StorageService()
 
     async def create_scan(
         self,
@@ -32,27 +49,44 @@ class ScanService:
         upload_id: uuid.UUID | None = None,
         repository_id: uuid.UUID | None = None,
         user_id: uuid.UUID,
-    ):
-        """Create a new scan and queue it for processing.
+        idempotency_key: str | None = None,
+        config: dict[str, Any] | None = None,
+    ) -> Scan:
+        """Create a new scan and queue it for asynchronous processing.
 
-        Validates:
-        - Either source_snapshot_id, upload_id, or repository_id must be provided
-        - If source_snapshot_id is provided, it must belong to the project and be in READY status
-        - No active scan already running for the project
+        Enforces:
+        - Idempotency deduplication when idempotency_key is provided
+        - Immutable SourceSnapshot binding (must belong to project & be READY)
+        - Tenant boundary and single active scan concurrency guard
         """
+        # 1. Idempotency check: if key already exists, return existing scan
+        if idempotency_key:
+            stmt_idem = select(Scan).where(Scan.idempotency_key == idempotency_key)
+            res_idem = await self.db.execute(stmt_idem)
+            existing_scan = res_idem.scalar_one_or_none()
+            if existing_scan:
+                return existing_scan
+
+        # 2. Validate source targets
         if source_snapshot_id is None and upload_id is None and repository_id is None:
-            raise ValidationError("Either source_snapshot_id, upload_id, or repository_id is required")
+            raise ValidationError("A source snapshot, upload, or repository is required to start a scan")
 
-        # Check for active scans
+        # Resolve project to ensure it exists and get organization_id
+        stmt_proj = select(Project).where(Project.id == project_id)
+        res_proj = await self.db.execute(stmt_proj)
+        project = res_proj.scalar_one_or_none()
+        if not project:
+            raise NotFoundError(f"Project {project_id} not found")
+
+        # Guard against duplicate concurrent active scans on the same project
         if await self.scan_repo.has_active_scan(project_id):
-            raise ConflictError("Project already has an active scan")
+            raise ConflictError("Project already has an active scan running")
 
-        # Validate snapshot if provided
+        # 3. Validate immutable snapshot
         if source_snapshot_id:
-            from backend.app.models.source_snapshot import SourceSnapshot
-            stmt = select(SourceSnapshot).where(SourceSnapshot.id == source_snapshot_id)
-            res = await self.db.execute(stmt)
-            snapshot = res.scalar_one_or_none()
+            stmt_snap = select(SourceSnapshot).where(SourceSnapshot.id == source_snapshot_id)
+            res_snap = await self.db.execute(stmt_snap)
+            snapshot = res_snap.scalar_one_or_none()
             if snapshot is None or snapshot.project_id != project_id:
                 raise NotFoundError(f"Snapshot {source_snapshot_id} not found in this project")
             if snapshot.status != "ready":
@@ -60,27 +94,49 @@ class ScanService:
                     f"Cannot scan snapshot in '{snapshot.status}' state. Only READY snapshots can be scanned."
                 )
 
-        # Validate upload if provided
-        if upload_id:
-            upload = await self.upload_repo.get_by_id(upload_id)
-            if upload is None:
-                raise NotFoundError(f"Upload {upload_id} not found")
-            if upload.project_id != project_id:
-                raise ValidationError("Upload does not belong to this project")
-
-        # Create scan
-        scan = await self.scan_repo.create(
+        # 4. Create scan entity
+        scan = Scan(
+            id=uuid.uuid4(),
             project_id=project_id,
+            organization_id=project.organization_id,
             source_snapshot_id=source_snapshot_id,
             upload_id=upload_id,
             repository_id=repository_id,
             created_by=user_id,
-            status="pending",
-            progress=0.0,
-            current_stage="created",
+            status="queued",
+            progress=5.0,
+            current_stage="queued",
+            stage_attempt=1,
+            retry_count=0,
+            timeout_seconds=config.get("timeout_seconds", 1800) if config else 1800,
+            config=config or {},
+            idempotency_key=idempotency_key,
         )
+        self.db.add(scan)
+        await self.db.commit()
+        await self.db.refresh(scan)
 
-        # Audit
+        # 5. Insert initial stage run & event records
+        initial_run = ScanStageRun(
+            scan_id=scan.id,
+            stage="queued",
+            attempt=1,
+            status="completed",
+            duration_seconds=0.0,
+            stage_metadata={"created_by": str(user_id)},
+        )
+        self.db.add(initial_run)
+
+        initial_event = ScanEvent(
+            scan_id=scan.id,
+            event_type="scan.queued",
+            stage="queued",
+            payload={"source_snapshot_id": str(source_snapshot_id) if source_snapshot_id else None},
+        )
+        self.db.add(initial_event)
+        await self.db.commit()
+
+        # 6. Audit log
         await self.audit.log(
             user_id=user_id,
             action="scan.started",
@@ -88,52 +144,228 @@ class ScanService:
             resource_id=str(scan.id),
             metadata={
                 "project_id": str(project_id),
-                "upload_id": str(upload_id) if upload_id else None,
+                "source_snapshot_id": str(source_snapshot_id) if source_snapshot_id else None,
             },
         )
 
+        # 7. Enqueue Celery orchestration task
+        from backend.app.workers.scan_tasks import orchestrate_scan
+
+        orchestrate_scan.delay(str(scan.id))
+
         return scan
 
-    async def get_scan(self, scan_id: uuid.UUID):
-        """Get a scan by ID."""
-        scan = await self.scan_repo.get_by_id(scan_id)
+    async def get_scan(self, scan_id: uuid.UUID) -> Scan:
+        """Get full details of a scan."""
+        stmt = (
+            select(Scan)
+            .where(Scan.id == scan_id)
+            .options(
+                selectinload(Scan.stage_runs),
+                selectinload(Scan.artifacts),
+                selectinload(Scan.source_snapshot),
+            )
+        )
+        res = await self.db.execute(stmt)
+        scan = res.scalar_one_or_none()
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} not found")
         return scan
 
-    async def get_scan_status(self, scan_id: uuid.UUID):
-        """Get scan status (lightweight)."""
-        return await self.get_scan(scan_id)
+    async def get_scan_status(self, scan_id: uuid.UUID) -> Scan:
+        """Get lightweight scan status for polling."""
+        stmt = select(Scan).where(Scan.id == scan_id)
+        res = await self.db.execute(stmt)
+        scan = res.scalar_one_or_none()
+        if scan is None:
+            raise NotFoundError(f"Scan {scan_id} not found")
+        return scan
 
     async def list_scans(
         self,
         project_id: uuid.UUID | None = None,
+        organization_id: uuid.UUID | None = None,
         *,
         page: int = 1,
         page_size: int = 20,
-    ):
-        """List scans, optionally filtered by project."""
-        if project_id:
-            return await self.scan_repo.get_project_scans(
-                project_id, page=page, page_size=page_size
+    ) -> tuple[list[Scan], int]:
+        """List scans filtered by project and/or organization."""
+        if organization_id is not None:
+            stmt = (
+                select(Scan)
+                .join(Project, Scan.project_id == Project.id)
+                .where(Project.organization_id == organization_id)
+                .order_by(Scan.created_at.desc())
             )
-        return await self.scan_repo.get_all(page=page, page_size=page_size)
+            count_stmt = (
+                select(func.count(Scan.id))
+                .join(Project, Scan.project_id == Project.id)
+                .where(Project.organization_id == organization_id)
+            )
+            if project_id is not None:
+                stmt = stmt.where(Scan.project_id == project_id)
+                count_stmt = count_stmt.where(Scan.project_id == project_id)
+        elif project_id is not None:
+            stmt = select(Scan).where(Scan.project_id == project_id).order_by(Scan.created_at.desc())
+            count_stmt = select(func.count(Scan.id)).where(Scan.project_id == project_id)
+        else:
+            stmt = select(Scan).order_by(Scan.created_at.desc())
+            count_stmt = select(func.count(Scan.id))
 
-    async def cancel_scan(self, scan_id: uuid.UUID, user_id: uuid.UUID):
-        """Cancel an active scan."""
-        scan = await self.get_scan(scan_id)
-        terminal_states = {"completed", "failed", "cancelled"}
-        if scan.status in terminal_states:
-            raise ConflictError(f"Scan is already in terminal state: {scan.status}")
+        res_total = await self.db.execute(count_stmt)
+        total = res_total.scalar() or 0
 
-        await self.scan_repo.update_status(
-            scan_id,
-            status="cancelled",
-            error_message="Cancelled by user",
+        offset = (page - 1) * page_size
+        stmt = stmt.offset(offset).limit(page_size)
+        res = await self.db.execute(stmt)
+        scans = list(res.scalars().all())
+
+        return scans, total
+
+    async def get_scan_stages(self, scan_id: uuid.UUID) -> list[ScanStageRun]:
+        """Retrieve execution history of all stages for a scan."""
+        stmt = (
+            select(ScanStageRun)
+            .where(ScanStageRun.scan_id == scan_id)
+            .order_by(ScanStageRun.created_at.asc(), ScanStageRun.attempt.asc())
         )
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())
+
+    async def get_scan_artifacts(self, scan_id: uuid.UUID) -> list[AnalysisArtifact]:
+        """Retrieve all canonical analysis artifacts generated for a scan.
+        
+        Truthfulness enforcement: If PDG was produced under native fallback with 0 edges
+        or marked unsupported, ensure its status is explicitly 'unsupported' with metadata explanation.
+        """
+        stmt = (
+            select(AnalysisArtifact)
+            .where(AnalysisArtifact.scan_id == scan_id)
+            .order_by(AnalysisArtifact.created_at.asc())
+        )
+        res = await self.db.execute(stmt)
+        artifacts = list(res.scalars().all())
+        for art in artifacts:
+            if art.artifact_type == "PDG" and (
+                art.status == "unsupported"
+                or (art.tool_name == "native_ast_analyzer" and art.edge_count == 0)
+            ):
+                art.status = "unsupported"
+                note_text = (
+                    "Program Dependence Graph (PDG) generation requires the Joern analysis backend. "
+                    "The current native analyzer does not provide control/data-dependence analysis."
+                )
+                if art.artifact_metadata is None:
+                    art.artifact_metadata = {}
+                if isinstance(art.artifact_metadata, dict):
+                    art.artifact_metadata.setdefault("note", note_text)
+                    art.artifact_metadata.setdefault("engine_fallback", True)
+        return artifacts
+
+    async def get_artifact_detail(self, scan_id: uuid.UUID, artifact_id: uuid.UUID) -> tuple[AnalysisArtifact, str]:
+        """Retrieve artifact and its presigned download URL."""
+        stmt = select(AnalysisArtifact).where(
+            AnalysisArtifact.id == artifact_id, AnalysisArtifact.scan_id == scan_id
+        )
+        res = await self.db.execute(stmt)
+        artifact = res.scalar_one_or_none()
+        if not artifact:
+            raise NotFoundError(f"Artifact {artifact_id} not found for scan {scan_id}")
+
+        if artifact.status == "unsupported" or (
+            artifact.artifact_type == "PDG"
+            and (artifact.tool_name == "native_ast_analyzer" and artifact.edge_count == 0)
+        ):
+            raise BadRequestError(
+                "Program Dependence Graph (PDG) is unsupported under the native AST analyzer fallback. "
+                "Download URL cannot be generated."
+            )
+
+        download_url = await self.storage.generate_download_url(artifact.artifact_uri, expires_in_seconds=3600)
+        return artifact, download_url
+
+    async def get_artifact_content(self, scan_id: uuid.UUID, artifact_id: uuid.UUID) -> tuple[AnalysisArtifact, bytes]:
+        """Retrieve artifact record and raw content bytes from storage for safe direct download."""
+        stmt = select(AnalysisArtifact).where(
+            AnalysisArtifact.id == artifact_id, AnalysisArtifact.scan_id == scan_id
+        )
+        res = await self.db.execute(stmt)
+        artifact = res.scalar_one_or_none()
+        if not artifact:
+            raise NotFoundError(f"Artifact {artifact_id} not found for scan {scan_id}")
+
+        if artifact.status == "unsupported" or (
+            artifact.artifact_type == "PDG"
+            and (artifact.tool_name == "native_ast_analyzer" and artifact.edge_count == 0)
+        ):
+            raise BadRequestError(
+                "Program Dependence Graph (PDG) is unsupported under the native AST analyzer fallback. "
+                "Download is not available."
+            )
+
+        content_bytes = await self.storage.read_file(artifact.artifact_uri)
+        return artifact, content_bytes
+
+    async def get_taint_evidence(self, scan_id: uuid.UUID) -> dict[str, Any]:
+        """Retrieve structured taint evidence payload for a scan."""
+        stmt = select(AnalysisArtifact).where(
+            AnalysisArtifact.scan_id == scan_id, AnalysisArtifact.artifact_type == "TAINT"
+        )
+        res = await self.db.execute(stmt)
+        taint_art = res.scalar_one_or_none()
+        if not taint_art:
+            return {
+                "status": "not_run",
+                "message": "Taint analysis was not executed for this scan.",
+                "paths": [],
+                "source_count": 0,
+                "sink_count": 0,
+            }
+
+        if taint_art.status == "failed":
+            return {
+                "status": "failed",
+                "message": taint_art.error_message or "Taint analysis execution failed.",
+                "paths": [],
+                "source_count": 0,
+                "sink_count": 0,
+            }
+
+        try:
+            content_bytes = await self.storage.read_file(taint_art.artifact_uri)
+            data = json.loads(content_bytes.decode("utf-8"))
+            data["status"] = "ready"
+            return data
+        except Exception as err:
+            return {
+                "status": "failed",
+                "message": f"Failed to load taint evidence payload: {str(err)}",
+                "metadata": taint_art.artifact_metadata or {},
+                "paths": [],
+                "source_count": taint_art.node_count,
+            }
+
+    async def cancel_scan(self, scan_id: uuid.UUID, user_id: uuid.UUID) -> Scan:
+        """Cancel an active scan."""
+        scan = await self.lifecycle.cancel_scan(scan_id, user_id=user_id)
         await self.audit.log(
             user_id=user_id,
             action="scan.cancelled",
             resource_type="scan",
             resource_id=str(scan_id),
         )
+        return scan
+
+    async def retry_scan(self, scan_id: uuid.UUID, user_id: uuid.UUID) -> Scan:
+        """Retry a failed or timed out scan."""
+        scan = await self.lifecycle.retry_scan(scan_id)
+        from backend.app.workers.scan_tasks import orchestrate_scan
+
+        orchestrate_scan.delay(str(scan.id))
+        await self.audit.log(
+            user_id=user_id,
+            action="scan.retried",
+            resource_type="scan",
+            resource_id=str(scan_id),
+        )
+        return scan

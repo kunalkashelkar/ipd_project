@@ -8,9 +8,10 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query
 
-from backend.app.core.permissions import get_current_active_user
+from backend.app.core.authorization import get_current_user
 from backend.app.core.response import paginated_response, success_response
 from backend.app.database.session import AsyncSession, get_db
+from backend.app.models.user import User
 from backend.app.schemas.notification import NotificationResponse, UnreadCountResponse
 from backend.app.services.notification_service import NotificationService
 
@@ -22,7 +23,7 @@ async def get_notifications(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     unread_only: bool = Query(False),
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List notifications for the current user."""
@@ -44,7 +45,7 @@ async def get_notifications(
 
 @router.get("/unread-count", summary="Get unread notification count")
 async def get_unread_count(
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the number of unread notifications for the badge."""
@@ -59,7 +60,7 @@ async def get_unread_count(
 @router.put("/{notification_id}/read", summary="Mark notification as read")
 async def mark_read(
     notification_id: uuid.UUID,
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Mark a single notification as read."""
@@ -73,7 +74,7 @@ async def mark_read(
 
 @router.put("/read-all", summary="Mark all notifications as read")
 async def mark_all_read(
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Mark all unread notifications as read for the user."""

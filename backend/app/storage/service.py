@@ -57,6 +57,20 @@ class StorageService:
         clean_rel = relative_path.replace("\\", "/").lstrip("/")
         return f"organizations/{org_id}/projects/{project_id}/snapshots/{snapshot_id}/{kind}/{clean_rel}"
 
+    @staticmethod
+    def scan_artifact_key(
+        org_id: uuid.UUID,
+        project_id: uuid.UUID,
+        scan_id: uuid.UUID,
+        artifact_type: str,
+        artifact_id: uuid.UUID,
+        ext: str = ".json",
+    ) -> str:
+        """organizations/{org_id}/projects/{project_id}/scans/{scan_id}/artifacts/{artifact_type}/{artifact_id}{ext}"""
+        clean_ext = ext if ext.startswith(".") else f".{ext}"
+        clean_type = artifact_type.lower()
+        return f"organizations/{org_id}/projects/{project_id}/scans/{scan_id}/artifacts/{clean_type}/{artifact_id}{clean_ext}"
+
     # ── Storage Operations ──────────────────────────────────
 
     async def save_upload(

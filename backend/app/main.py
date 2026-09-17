@@ -28,6 +28,7 @@ from backend.app.routers import (
     api_key_router,
     audit_router,
     auth_router,
+    finding_router,
     health_router,
     invitation_router,
     notification_router,
@@ -113,7 +114,8 @@ app.include_router(snapshot_router, prefix=API_PREFIX)
 app.include_router(upload_router, prefix=API_PREFIX)
 app.include_router(scan_router, prefix=API_PREFIX)
 
-# Batch 4: Results & Reports
+# Batch 4: Results, Findings & Reports
+app.include_router(finding_router, prefix=API_PREFIX)
 app.include_router(result_router, prefix=API_PREFIX)
 app.include_router(report_router, prefix=API_PREFIX)
 

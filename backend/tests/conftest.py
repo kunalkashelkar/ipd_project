@@ -61,6 +61,10 @@ async def seed_test_rbac(session: AsyncSession) -> dict[str, Role]:
         ("scan.read", "scan"),
         ("scan.create", "scan"),
         ("finding.read", "finding"),
+        ("finding.update", "finding"),
+        ("finding.assign", "finding"),
+        ("finding.suppress", "finding"),
+        ("finding.accept_risk", "finding"),
         ("api_key.read", "api_key"),
         ("api_key.create", "api_key"),
         ("api_key.revoke", "api_key"),
@@ -79,7 +83,11 @@ async def seed_test_rbac(session: AsyncSession) -> dict[str, Role]:
     mappings = {
         "owner": [k for k, _ in perm_keys],
         "admin": [k for k, _ in perm_keys],
-        "security_analyst": ["organization.read", "team.read", "project.read", "repository.read", "scan.read", "scan.create", "finding.read", "audit.read"],
+        "security_analyst": [
+            "organization.read", "team.read", "project.read", "repository.read",
+            "scan.read", "scan.create", "finding.read", "finding.update",
+            "finding.assign", "finding.suppress", "finding.accept_risk", "audit.read"
+        ],
         "developer": ["organization.read", "team.read", "project.read", "repository.read", "scan.read", "scan.create", "finding.read"],
         "viewer": ["organization.read", "team.read", "project.read", "repository.read", "scan.read", "finding.read"],
     }

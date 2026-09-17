@@ -17,6 +17,8 @@ class ScanCreate(BaseModel):
     source_snapshot_id: uuid.UUID | None = None
     upload_id: uuid.UUID | None = None
     repository_id: uuid.UUID | None = None
+    idempotency_key: str | None = None
+    config: dict | None = None
 
 
 class ScanResponse(BaseModel):
@@ -24,6 +26,7 @@ class ScanResponse(BaseModel):
 
     id: uuid.UUID
     project_id: uuid.UUID
+    organization_id: uuid.UUID | None = None
     source_snapshot_id: uuid.UUID | None = None
     upload_id: uuid.UUID | None = None
     repository_id: uuid.UUID | None = None
@@ -31,9 +34,18 @@ class ScanResponse(BaseModel):
     status: str
     progress: float = 0.0
     current_stage: str | None = None
-    error_message: str | None = None
+    stage_attempt: int = 1
+    retry_count: int = 0
+    timeout_seconds: int = 1800
+    worker_id: str | None = None
+    heartbeat_at: datetime | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    failure_code: str | None = None
+    failure_reason: str | None = None
+    error_message: str | None = None
+    config: dict | None = None
     ai_model_version: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -48,6 +60,53 @@ class ScanStatusResponse(BaseModel):
     status: str
     progress: float
     current_stage: str | None = None
+    failure_code: str | None = None
+    failure_reason: str | None = None
+    cancelled_at: datetime | None = None
     error_message: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ScanStageRunResponse(BaseModel):
+    """Execution history of a specific scan stage."""
+
+    id: uuid.UUID
+    scan_id: uuid.UUID
+    stage: str
+    attempt: int
+    status: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_seconds: float | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    metadata: dict | None = Field(default=None, alias="stage_metadata")
+    created_at: datetime
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+
+class AnalysisArtifactResponse(BaseModel):
+    """Metadata for canonical analysis artifacts (AST, CFG, PDG, CPG, CALL_GRAPH, TAINT)."""
+
+    id: uuid.UUID
+    scan_id: uuid.UUID
+    source_snapshot_id: uuid.UUID
+    artifact_type: str
+    schema_version: str = "1.0.0"
+    artifact_uri: str
+    content_hash: str
+    size_bytes: int = 0
+    status: str
+    tool_name: str | None = None
+    tool_version: str | None = None
+    node_count: int = 0
+    edge_count: int = 0
+    metadata: dict | None = Field(default=None, alias="artifact_metadata")
+    created_at: datetime
+    completed_at: datetime | None = None
+    error_message: str | None = None
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
+

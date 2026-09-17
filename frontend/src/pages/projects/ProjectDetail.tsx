@@ -167,6 +167,7 @@ export default function ProjectDetail() {
   }
 
   const latestScan = scans.length > 0 ? scans[0] : null;
+  const latestCompletedScan = scans.find((s) => s.status === 'completed');
   const readySnapshots = snapshots.filter((s) => s.status === 'ready');
 
   return (
@@ -850,17 +851,20 @@ export default function ProjectDetail() {
             <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-40 text-muted-foreground" />
             <p className="text-sm font-semibold text-foreground">Project Vulnerability Findings</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-              Vulnerabilities are evaluated per scan execution.
-              {scans.some((s) => s.status === 'completed')
-                ? ' Completed scans have findings available in the analysis workspace.'
-                : ' Run a security scan on this project to view vulnerability attributions and patches.'}
+              Findings are evaluated per scan execution. Open the latest completed scan to investigate persisted findings.
             </p>
-            {latestScan && latestScan.status === 'completed' && (
-              <Link to={`/projects/${project.id}/results?scan_id=${latestScan.id}`}>
+            {latestCompletedScan ? (
+              <Link to={`/projects/${project.id}/results?scan_id=${latestCompletedScan.id}`}>
                 <Button size="sm" variant="outline" className="mt-4 text-xs gap-1.5">
-                  Open Latest Scan Workspace <ArrowRight className="w-3.5 h-3.5" />
+                  Open Latest Completed Scan Workspace <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
+            ) : (
+              <p className="text-xs text-muted-foreground/80 mt-3">
+                {scans.length > 0
+                  ? 'No completed scans available yet. Wait for active scans to complete.'
+                  : 'Run a security scan on this project to evaluate vulnerabilities.'}
+              </p>
             )}
           </CardContent>
         </Card>

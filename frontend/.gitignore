@@ -1,0 +1,18 @@
+# Frontend Ignore Rules
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm/
+.eslintcache
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

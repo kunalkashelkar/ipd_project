@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Activity, ShieldAlert, FileText, Settings as SettingsIcon, Plus } from 'lucide-react';
-import { PageHeader, Breadcrumbs, EmptyState, Button, Card, CardContent, Spinner, ErrorState } from '../../components/ui';
+import { PageHeader, Breadcrumbs, EmptyState, Button, Card, CardContent, Spinner, ErrorState, Badge } from '../../components/ui';
 import { projectService } from '../../services/projectService';
-import { Project } from '../../types';
+import { findingService } from '../../services/findingService';
+import { Project, FindingListItem } from '../../types';
 
 function useCurrentProject(projectId?: string) {
   const [project, setProject] = useState<Project | null>(null);
@@ -72,10 +73,22 @@ export function ProjectScans() {
 export function ProjectFindings() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { project, loading, error } = useCurrentProject(projectId);
+  const { project, loading: projectLoading, error: projectError } = useCurrentProject(projectId);
+  const [findings, setFindings] = useState<FindingListItem[]>([]);
+  const [loadingFindings, setLoadingFindings] = useState(true);
 
-  if (loading) return <div className="p-12"><Spinner size="lg" /></div>;
-  if (error || !project) return <ErrorState message={error || 'Project not found'} onRetry={() => window.location.reload()} />;
+  useEffect(() => {
+    if (!projectId) return;
+    setLoadingFindings(true);
+    findingService
+      .getProjectFindings(projectId)
+      .then((data) => setFindings(data.items || []))
+      .catch(() => setFindings([]))
+      .finally(() => setLoadingFindings(false));
+  }, [projectId]);
+
+  if (projectLoading || loadingFindings) return <div className="p-12"><Spinner size="lg" /></div>;
+  if (projectError || !project) return <ErrorState message={projectError || 'Project not found'} onRetry={() => window.location.reload()} />;
 
   return (
     <div className="space-y-6 pb-12">
@@ -90,18 +103,80 @@ export function ProjectFindings() {
           />
         }
         title={`${project.name} — Findings`}
-        description="Detailed vulnerability findings, CWE attributions, and remediation patches."
-      />
-      <EmptyState
-        icon={<ShieldAlert className="w-8 h-8 text-muted-foreground/60" />}
-        title="No Vulnerabilities Detected Yet"
-        description="Findings will appear here after automated graph extraction and ML classification in Phases 4 & 5."
+        description="Persistent vulnerability findings and security classifications across project scans."
         action={
-          <Button onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
-            Start Scan
+          <Button size="sm" onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            New Scan
           </Button>
         }
       />
+
+      {findings.length === 0 ? (
+        <EmptyState
+          icon={<ShieldAlert className="w-8 h-8 text-muted-foreground/60" />}
+          title="No Vulnerabilities Detected Yet"
+          description="Findings will appear here once an automated vulnerability scan runs against an immutable snapshot."
+          action={
+            <Button onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
+              Start Scan
+            </Button>
+          }
+        />
+      ) : (
+        <div className="space-y-3">
+          {findings.map((f) => {
+            const sev = f.severity.toLowerCase();
+            return (
+              <Card key={f.id} className="p-4 hover:border-primary/50 transition-colors">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                          sev === 'critical'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : sev === 'high'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : sev === 'medium'
+                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        }`}
+                      >
+                        {f.severity}
+                      </span>
+                      {f.cwe_id && (
+                        <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                          {f.cwe_id}
+                        </span>
+                      )}
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted/50 text-foreground">
+                        {f.status}
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-semibold text-foreground">{f.title}</h4>
+                    <p className="text-xs font-mono text-muted-foreground">
+                      {f.latest_file_path || 'unknown file'}
+                      {f.latest_line_number ? `:${f.latest_line_number}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-mono font-bold text-amber-400 block">
+                      Risk {f.risk_score.toFixed(1)}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground block">
+                      Conf {Math.round(f.confidence * 100)}%
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {f.occurrence_count} {f.occurrence_count === 1 ? 'scan' : 'scans'}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

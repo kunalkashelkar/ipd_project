@@ -9,13 +9,13 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.models.finding import Finding
 from backend.app.models.project import Project
 from backend.app.models.scan import Scan
-from backend.app.models.scan_result import ScanResult
 
 
 class AnalyticsService:
-    """Provides dashboard analytics data."""
+    """Provides dashboard analytics data using authoritative Phase 5 Finding domain."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -26,26 +26,34 @@ class AnalyticsService:
         user_id: uuid.UUID | None = None,
         role: str | None = None,
     ) -> dict:
-        """Get high-level metrics for the dashboard strictly scoped to an organization."""
+        """Get high-level metrics for the dashboard strictly scoped to an organization.
         
-        # Base queries scoped to tenant organization
+        Definitions:
+        - Total Projects: Active, non-archived projects in organization.
+        - Total Scans: Scans executed across projects in organization.
+        - Total Findings: Persistent deduplicated findings in organization (excluding false positives/suppressed).
+        - Critical Issues: Active critical findings requiring immediate triage.
+        """
+        # 1. Base queries scoped to tenant organization
         project_query = select(Project).where(Project.is_archived == False)  # noqa: E712
         scan_query = select(Scan).join(Project, Scan.project_id == Project.id)
-        result_query = select(ScanResult).join(Scan, ScanResult.scan_id == Scan.id).join(Project, Scan.project_id == Project.id)
+        
+        # Authoritative Phase 5 Finding query
+        finding_query = select(Finding).join(Project, Finding.project_id == Project.id)
 
         if organization_id is not None:
             project_query = project_query.where(Project.organization_id == organization_id)
             scan_query = scan_query.where(Project.organization_id == organization_id)
-            result_query = result_query.where(Project.organization_id == organization_id)
+            finding_query = finding_query.where(Finding.organization_id == organization_id)
         elif role != "admin" and user_id is not None:
             project_query = project_query.where(Project.owner_id == user_id)
             scan_query = scan_query.where(Project.owner_id == user_id)
-            result_query = result_query.where(Project.owner_id == user_id)
+            finding_query = finding_query.where(Project.owner_id == user_id)
 
-        # Total projects
+        # 2. Total projects
         total_projects = (await self.db.execute(select(func.count()).select_from(project_query.subquery()))).scalar() or 0
 
-        # Scan metrics
+        # 3. Scan metrics
         total_scans = (await self.db.execute(select(func.count()).select_from(scan_query.subquery()))).scalar() or 0
         
         completed_scans = (await self.db.execute(
@@ -56,24 +64,43 @@ class AnalyticsService:
             select(func.count()).select_from(scan_query.where(Scan.status == "failed").subquery())
         )).scalar() or 0
 
-        # Vulnerability counts by severity
-        severity_counts = {}
-        if total_scans > 0:
-            severity_query = select(ScanResult.severity, func.count()).select_from(result_query.subquery()).group_by(ScanResult.severity)
-            severity_result = await self.db.execute(severity_query)
-            severity_counts = {row[0]: row[1] for row in severity_result.all()}
+        # 4. Authoritative Vulnerability counts from Finding domain
+        # Active/unresolved findings (exclude FALSE_POSITIVE and SUPPRESSED from active security counts)
+        finding_filters = [
+            func.upper(Finding.status).notin_(["FALSE_POSITIVE", "SUPPRESSED"])
+        ]
+        if organization_id is not None:
+            finding_filters.append(Finding.organization_id == organization_id)
+        elif role != "admin" and user_id is not None:
+            finding_filters.append(Project.owner_id == user_id)
+
+        severity_query = (
+            select(
+                func.lower(Finding.severity),
+                func.count(Finding.id.distinct())
+            )
+            .join(Project, Finding.project_id == Project.id)
+            .where(*finding_filters)
+            .group_by(func.lower(Finding.severity))
+        )
+        severity_result = await self.db.execute(severity_query)
+        severity_counts = {row[0]: row[1] for row in severity_result.all()}
 
         total_vulnerabilities = sum(severity_counts.values())
 
-        # Top CWEs
+        # Top CWEs from authoritative findings
         top_cwe = []
         if total_vulnerabilities > 0:
             cwe_query = (
-                select(ScanResult.cwe_id, func.count())
-                .select_from(result_query.subquery())
-                .where(ScanResult.cwe_id.isnot(None))
-                .group_by(ScanResult.cwe_id)
-                .order_by(func.count().desc())
+                select(Finding.cwe_id, func.count(Finding.id.distinct()))
+                .join(Project, Finding.project_id == Project.id)
+                .where(
+                    *finding_filters,
+                    Finding.cwe_id.isnot(None),
+                    Finding.cwe_id != "",
+                )
+                .group_by(Finding.cwe_id)
+                .order_by(func.count(Finding.id.distinct()).desc())
                 .limit(5)
             )
             cwe_result = await self.db.execute(cwe_query)
@@ -92,7 +119,7 @@ class AnalyticsService:
                 "low": severity_counts.get("low", 0),
                 "info": severity_counts.get("info", 0),
             },
-            "recent_scans": [],  # Could add recent scans here
+            "recent_scans": [],
             "scan_success_rate": (completed_scans / total_scans) if total_scans > 0 else 0.0,
             "vulnerabilities_by_cwe": top_cwe,
         }

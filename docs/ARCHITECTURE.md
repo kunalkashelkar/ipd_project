@@ -203,12 +203,89 @@ The central dependency `resolve_organization_context` validates:
 
 ---
 
-## 8. Explicitly Deferred Phase 3–8 Features
+---
 
-The following features belong strictly to future phases and are intentionally NOT implemented in Phase 2:
-- **Phase 3**: Real Git clone/webhook sync (GitHub/GitLab apps), AST/source snapshot preprocessing.
-- **Phase 4**: Joern scanning engine, CPG/CFG/PDG graph generation, data-flow & taint analysis execution.
-- **Phase 5**: GNN & CodeBERT model inference pipelines, real vulnerability prediction correlation.
-- **Phase 6**: XAI explanations (Captum/integrated gradients), LLM remediation generation, automated patch validation.
-- **Phase 7**: Automated PDF/HTML report exports, external CI/CD & PR scan integrations.
-- **Phase 8**: Production hardening, HA scaling, distributed worker clusters.
+## 9. Phase 4 Architecture — Scan Pipeline, Static Analysis, Graph & Taint
+
+### 9.1 Scan Lifecycle & Centralized State Machine
+The scan lifecycle is managed by `ScanStateMachine` and `ScanLifecycleService`:
+```
+SOURCE SNAPSHOT (READY)
+      ↓
+SCAN CREATED (progress: 0%)
+      ↓
+QUEUED (progress: 5%)
+      ↓
+PREPARING (progress: 10%)
+      ↓
+CHECKOUT (progress: 20%)
+      ↓
+PREPROCESSING (progress: 35%)
+      ↓
+STATIC_ANALYSIS (progress: 55%)
+      ↓
+GRAPH_PROCESSING (progress: 75%)
+      ↓
+AI_ANALYSIS (progress: 85%)  ← Explicitly SKIPPED / NOT_CONFIGURED (Phase 5 Boundary)
+      ↓
+POST_PROCESSING (progress: 95%)
+      ↓
+COMPLETED (progress: 100%)
+```
+
+Terminal states: `FAILED`, `CANCELLED`, `TIMED_OUT`.
+Retry state: `RETRYING` (transitions safely back to `QUEUED`).
+All transitions enforce forward progression rules, emit audit records into `scan_events`, and maintain persistent timing and duration metrics in `scan_stage_runs`.
+
+### 9.2 Concurrency & Idempotency
+1. **Idempotency Key**: Scans accept a unique `idempotency_key`. Repeat requests return the existing scan record rather than creating a duplicate run.
+2. **Snapshot Invariant**: Every scan is bound to exactly one immutable `source_snapshot_id`. Scans against non-`READY` snapshots are rejected with 422.
+3. **Task Sandbox Isolation**: Every stage execution creates an isolated sandbox directory (`/tmp/xai_scan_{scan_id}_{attempt}`) which is guaranteed to be cleaned up in a `finally` block.
+
+### 9.3 StaticAnalysisService & Process Runner
+- `AnalysisProcessRunner` executes command arrays without `shell=True`, preventing shell injection. It applies strict per-process timeouts, buffers stdout/stderr up to configurable caps, and terminates rogue subprocesses cleanly with SIGKILL on timeout or cancellation.
+- `StaticAnalysisService` discovers configured Joern binaries (`joern-parse`) or uses the native AST/CPG builder to generate canonical representations.
+- Produces 5 canonical graph artifacts conforming to **Graph Schema v1.0.0**:
+  - **AST** (Abstract Syntax Tree)
+  - **CFG** (Control Flow Graph)
+  - **PDG** (Program Dependence Graph)
+  - **CPG** (Code Property Graph)
+  - **CALL_GRAPH** (Interprocedural Call Graph)
+- Every artifact computes a SHA-256 cryptographic hash and node/edge metrics stored in PostgreSQL, with the JSON payload stored under tenant-isolated paths in MinIO.
+
+### 9.4 Taint Analysis Pipeline
+- `TaintPipelineService` consumes the CPG and applies the rule-based source/sink/sanitizer detection engine.
+- Propagates taint across reaching definitions and data flows.
+- Produces structured static analysis evidence with attack paths, source locations, and sink locations.
+- **Strict Phase Boundary**: Taint paths are presented as *Static Analysis Evidence / Taint Paths*, NOT confirmed vulnerabilities. AI/vulnerability correlation is reserved for Phase 5.
+
+### 9.5 Phase 5 AI Inference & Finding Correlation Architecture
+Phase 5 implements the permanent AI provider contract and finding correlation engine:
+1. **AIInferenceProvider Boundary**:
+   - Abstract base class `AIInferenceProvider` in `backend/app/services/ai_inference/base.py`.
+   - Permanent contracts `CanonicalAIRequest` and `CanonicalAIPrediction` in `backend/app/services/ai_inference/contracts.py`.
+   - Providers are resolved through `get_ai_provider()` factory governed strictly by configuration (`AI_MODE`).
+   - Default provider is `MockAIProvider` (`mock-1.0`), which produces deterministic, reproducible, location-valid predictions derived from the actual snapshot source files and functions.
+   - `MockAIProvider` is an isolated implementation behind the boundary; domain, correlation, and API layers never import or depend on `MockAIProvider`.
+   - Optional experimental adapter `ExperimentalGraphCodeBERTProvider` is available for `graphcodebert.pt` checkpoint exploration without polluting the core finding engine.
+   - Future trained models (e.g. GraphCodeBERT + GAT + fusion) will drop into this exact provider interface with zero changes to finding, correlation, or frontend layers.
+
+2. **Finding Domain & Repeated Scan Deduplication**:
+   - Distinct models: `Finding` (persistent cross-scan security issue) and `FindingOccurrence` (immutable observation in a specific scan/snapshot).
+   - Deterministic fingerprinting algorithm (`v1.0`) hashing `vulnerability_type`, `cwe`, `relative_path`, `function_name`, and location.
+   - Repeated scans on the same immutable snapshot or unchanged code update `last_seen` on the existing `Finding` and record a new `FindingOccurrence` without creating duplicate findings.
+   - Versioned risk score formula (`v1.0`): `risk_score = round(0.50 * cvss + 0.30 * (confidence * 10) + 0.20 * reachability_boost, 1)`.
+   - Controlled finding lifecycle state machine: `OPEN` -> `CONFIRMED` -> `IN_PROGRESS` -> `FIX_PROPOSED` -> `UNDER_REVIEW` -> `FIXED` -> `VERIFIED` + `FALSE_POSITIVE`, `RISK_ACCEPTED`, `SUPPRESSED`, `REOPENED`.
+   - Lifecycle transitions, assignments, comments, and suppressions are audited in the centralized audit system.
+
+3. **Results Workspace**:
+   - Interactive vulnerability investigation interface providing summary statistics, searchable & filterable finding list, deep-dive source code viewer with highlighted vulnerable lines, static analysis evidence, taint flow traces, canonical graph metrics, and AI provenance details.
+
+---
+
+## 10. Explicitly Deferred Phase 6–8 Features
+
+The following features belong strictly to future phases and are intentionally NOT implemented in Phase 5:
+- **Phase 6**: XAI explanations (Captum, Integrated Gradients, SHAP, GNNExplainer), LLM remediation generation, automated patch generation, patch application, patch verification.
+- **Phase 7**: Automated PDF/HTML report exports, external CI/CD & PR scan integrations, Slack/email notifications.
+- **Phase 8**: Production hardening, HA scaling, distributed Kafka/Kubernetes clusters, SSO.

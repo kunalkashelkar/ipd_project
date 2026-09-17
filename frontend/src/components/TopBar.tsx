@@ -4,8 +4,11 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store';
 import { organizationService } from '../services/organizationService';
 import { notificationService } from '../services/notificationService';
+import { projectService } from '../services/projectService';
 import { Organization } from '../types';
 import toast from 'react-hot-toast';
+
+const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
 export function TopBar() {
   const location = useLocation();
@@ -16,8 +19,26 @@ export function TopBar() {
   const [newOrgName, setNewOrgName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [projectNames, setProjectNames] = useState<Record<string, string>>({});
 
   const paths = location.pathname.split('/').filter(Boolean);
+
+  // Fetch human-readable project name for breadcrumb when navigating project routes
+  useEffect(() => {
+    if (paths[0] === 'projects' && paths[1] && isUuid(paths[1])) {
+      const projectId = paths[1];
+      if (!projectNames[projectId]) {
+        projectService
+          .getProject(projectId)
+          .then((p) => {
+            if (p?.name) {
+              setProjectNames((prev) => ({ ...prev, [projectId]: p.name }));
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const fetchOrgs = async () => {
@@ -170,13 +191,26 @@ export function TopBar() {
           ) : (
             paths.map((p, idx) => {
               const isLast = idx === paths.length - 1;
-              const formatted = p.replace(/-/g, ' ');
+              const isProjectId = paths[0] === 'projects' && idx === 1 && isUuid(p);
+              const displayName = isProjectId && projectNames[p] ? projectNames[p] : p.replace(/-/g, ' ');
+              const targetUrl = '/' + paths.slice(0, idx + 1).join('/');
+
               return (
-                <React.Fragment key={p}>
+                <React.Fragment key={`${p}-${idx}`}>
                   {idx > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />}
-                  <span className={isLast ? 'text-foreground font-medium capitalize truncate' : 'capitalize truncate'}>
-                    {formatted}
-                  </span>
+                  {isLast ? (
+                    <span className="text-foreground font-medium truncate max-w-[200px]" title={displayName}>
+                      {displayName}
+                    </span>
+                  ) : (
+                    <Link
+                      to={targetUrl}
+                      className="hover:text-foreground capitalize truncate max-w-[150px] transition-colors"
+                      title={displayName}
+                    >
+                      {displayName}
+                    </Link>
+                  )}
                 </React.Fragment>
               );
             })

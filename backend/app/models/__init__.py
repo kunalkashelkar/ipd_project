@@ -2,6 +2,7 @@
 # Models Package — Re-export all SQLAlchemy models
 # ============================================================
 
+from backend.app.models.analysis_artifact import AnalysisArtifact
 from backend.app.models.api_key import ApiKey
 from backend.app.models.audit_log import AuditLog
 from backend.app.models.feedback import Feedback
@@ -16,19 +17,36 @@ from backend.app.models.project import Project
 from backend.app.models.rbac import Permission, Role, RolePermission
 from backend.app.models.report import Report
 from backend.app.models.repository import Repository
-from backend.app.models.scan import Scan
+from backend.app.models.scan import Scan, ScanEvent, ScanStageRun
 from backend.app.models.scan_log import ScanLog
 from backend.app.models.scan_result import ScanResult
 from backend.app.models.session import UserSession, VerificationToken
 from backend.app.models.source_snapshot import Function, SourceFile, SourceSnapshot
+from backend.app.models.ai_prediction import AIPrediction
+from backend.app.models.finding import (
+    Finding,
+    FindingAssignment,
+    FindingComment,
+    FindingOccurrence,
+    FindingStatusHistory,
+    FindingSuppression,
+)
 from backend.app.models.upload import Upload
 from backend.app.models.user import User
 from backend.app.models.vulnerability import Vulnerability
 
 __all__ = [
+    "AIPrediction",
+    "AnalysisArtifact",
     "ApiKey",
     "AuditLog",
     "Feedback",
+    "Finding",
+    "FindingAssignment",
+    "FindingComment",
+    "FindingOccurrence",
+    "FindingStatusHistory",
+    "FindingSuppression",
     "Function",
     "Notification",
     "Organization",
@@ -43,8 +61,10 @@ __all__ = [
     "Role",
     "RolePermission",
     "Scan",
+    "ScanEvent",
     "ScanLog",
     "ScanResult",
+    "ScanStageRun",
     "SourceFile",
     "SourceSnapshot",
     "Upload",

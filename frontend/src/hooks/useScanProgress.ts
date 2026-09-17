@@ -48,7 +48,7 @@ export function useScanProgress(scanId: string | null) {
       }));
 
       // Stop polling if scan is terminal
-      if (['completed', 'failed', 'cancelled'].includes(data.status)) {
+      if (['completed', 'failed', 'cancelled', 'timed_out'].includes(data.status)) {
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
@@ -68,7 +68,7 @@ export function useScanProgress(scanId: string | null) {
     const token = authStorage.getAccessToken();
 
     if (!token) {
-      // No token — fall back to polling
+      // No token — rely on polling
       startPolling();
       return;
     }
@@ -82,11 +82,7 @@ export function useScanProgress(scanId: string | null) {
       ws.onopen = () => {
         if (!mountedRef.current) return;
         setState((prev) => ({ ...prev, isConnected: true }));
-        // Stop polling if WS connects
-        if (pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
+        // Note: Polling is intentionally kept active as a reliable background heartbeat
       };
 
       ws.onmessage = (event) => {
@@ -102,6 +98,12 @@ export function useScanProgress(scanId: string | null) {
               currentStage: msg.current_stage ?? msg.stage ?? prev.currentStage,
               errorMessage: msg.error_message ?? prev.errorMessage,
             }));
+            if (['completed', 'failed', 'cancelled', 'timed_out'].includes(msg.status)) {
+              if (pollRef.current) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+              }
+            }
           }
         } catch {
           // Not JSON — ignore
@@ -109,22 +111,17 @@ export function useScanProgress(scanId: string | null) {
       };
 
       ws.onerror = () => {
-        // WS failed — fall back to polling
         if (mountedRef.current) {
           setState((prev) => ({ ...prev, isConnected: false }));
-          startPolling();
         }
       };
 
       ws.onclose = () => {
         if (!mountedRef.current) return;
         setState((prev) => ({ ...prev, isConnected: false }));
-        // Fall back to polling on close
-        startPolling();
       };
     } catch {
-      // WebSocket creation failed — fall back to polling
-      startPolling();
+      // WebSocket creation failed — polling is already active
     }
   }, [scanId]);
 
@@ -141,17 +138,24 @@ export function useScanProgress(scanId: string | null) {
     mountedRef.current = true;
 
     if (scanId) {
-      // Try WebSocket first, falls back to polling internally
-      connectWebSocket();
-      // Also start polling as a safety net (WS may take time to connect)
+      // Start polling immediately as reliable primary progress mechanism
       startPolling();
+      // Connect WebSocket for low-latency live event stream
+      connectWebSocket();
     }
 
     return () => {
       mountedRef.current = false;
       if (wsRef.current) {
-        wsRef.current.close();
+        const wsToClose = wsRef.current;
         wsRef.current = null;
+        if (wsToClose.readyState === WebSocket.OPEN) {
+          wsToClose.close(1000, 'Component unmounted');
+        } else if (wsToClose.readyState === WebSocket.CONNECTING) {
+          wsToClose.onopen = () => {
+            wsToClose.close(1000, 'Component unmounted');
+          };
+        }
       }
       if (pollRef.current) {
         clearInterval(pollRef.current);

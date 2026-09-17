@@ -6,11 +6,19 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
-from backend.app.core.permissions import get_current_active_user
+from backend.app.core.authorization import (
+    get_current_user,
+    require_scan_access,
+)
+from backend.app.core.exceptions import AuthorizationError
 from backend.app.core.response import paginated_response, success_response
 from backend.app.database.session import AsyncSession, get_db
+from backend.app.models.organization import OrganizationMember
+from backend.app.models.project import Project
+from backend.app.models.scan import Scan
+from backend.app.models.user import User
 from backend.app.schemas.report import ReportCreate, ReportResponse
 from backend.app.services.report_service import ReportService
 
@@ -22,10 +30,17 @@ async def get_scan_reports(
     scan_id: uuid.UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user=Depends(get_current_active_user),
+    scan_context: tuple[Scan, Project, OrganizationMember] = Depends(require_scan_access),
     db: AsyncSession = Depends(get_db),
 ):
     """List all reports generated for a specific scan."""
+    _, _, member = scan_context
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "report.read" not in granted:
+            raise AuthorizationError("Permission denied: Action requires 'report.read'")
+
     service = ReportService(db)
     reports, total = await service.get_scan_reports(
         scan_id=scan_id,
@@ -41,13 +56,21 @@ async def get_scan_reports(
     )
 
 
-@router.post("", summary="Request a new report")
+@router.post("", summary="Request a new report", status_code=status.HTTP_202_ACCEPTED)
 async def request_report(
     body: ReportCreate,
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Manually trigger report generation for a scan in a specific format."""
+    # Resolve scan and verify active organization membership with report.create permission
+    scan, _, member = await require_scan_access(body.scan_id, current_user, db)
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "report.create" not in granted:
+            raise AuthorizationError("Permission denied: Action requires 'report.create'")
+
     service = ReportService(db)
     report = await service.request_report(
         scan_id=body.scan_id,

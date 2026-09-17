@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 import zipfile
 from pathlib import Path
@@ -13,12 +14,14 @@ from backend.app.core.exceptions import ValidationError
 
 
 def safe_extract_zip(
-    zip_path: Path,
+    zip_source: Path | str | bytes | io.BytesIO,
     extract_to: Path,
     max_size: int | None = None,
     max_files: int | None = None,
 ) -> None:
     """Safely extract a ZIP archive protecting against Zip-Slip, zip-bombs, and symlink attacks.
+
+    Supports file paths (Path, str), raw binary data (bytes), or BytesIO objects.
 
     Guarantees:
     1. Every extracted entry strictly resides inside `extract_to`.
@@ -30,8 +33,18 @@ def safe_extract_zip(
     max_uncompressed_bytes = max_size or getattr(settings, "max_extraction_size_bytes", 500 * 1024 * 1024)
     max_entry_count = max_files or getattr(settings, "max_archive_files", 10000)
 
-    if not zipfile.is_zipfile(zip_path):
+    if isinstance(zip_source, bytes):
+        zip_obj: Path | io.BytesIO = io.BytesIO(zip_source)
+    elif isinstance(zip_source, str):
+        zip_obj = Path(zip_source)
+    else:
+        zip_obj = zip_source
+
+    if not zipfile.is_zipfile(zip_obj):
         raise ValidationError("Invalid or corrupt ZIP file")
+
+    if isinstance(zip_obj, io.BytesIO):
+        zip_obj.seek(0)
 
     extract_to_resolved = extract_to.resolve()
     extract_to_resolved.mkdir(parents=True, exist_ok=True)
@@ -39,7 +52,7 @@ def safe_extract_zip(
     total_size = 0
     file_count = 0
 
-    with zipfile.ZipFile(zip_path, "r") as zf:
+    with zipfile.ZipFile(zip_obj, "r") as zf:
         infolist = zf.infolist()
 
         if len(infolist) > max_entry_count:
