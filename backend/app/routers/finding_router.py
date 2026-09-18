@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from backend.app.core.authorization import (
     get_current_user,
     require_finding_access,
+    require_permission,
     require_project_access,
     require_scan_access,
 )
@@ -50,6 +51,7 @@ from backend.app.schemas.finding_schemas import (
     FindingStatusTransitionRequest,
     FindingSuppressionRequest,
     FindingSuppressionResponse,
+    GlobalFindingsSummary,
     ProjectFindingsSummary,
 )
 from backend.app.services.audit_service import AuditService
@@ -68,12 +70,175 @@ def _verify_member_permission(member: OrganizationMember, required_key: str) -> 
         raise AuthorizationError(f"Permission denied: Action requires '{required_key}'")
 
 
+# ── 0. Global Findings Listing & Summary (Active Organization) ──────
+
+
+@router.get("/findings", summary="List global findings for active organization")
+async def list_global_findings(
+    severity: str | None = Query(None),
+    status: str | None = Query(None),
+    cwe: str | None = Query(None),
+    project_id: str | None = Query(None),
+    search: str | None = Query(None),
+    sort_by: str = Query("risk_score", pattern="^(risk_score|severity|last_seen_at|first_seen_at|created_at)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    org_context: tuple[Organization, OrganizationMember] = Depends(require_permission("finding.read")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve paginated and filtered vulnerability findings across the active organization."""
+    org, _ = org_context
+
+    query = (
+        select(Finding)
+        .join(Project, Finding.project_id == Project.id)
+        .where(Finding.organization_id == org.id)
+    )
+
+    # Active finding semantics: exclude FALSE_POSITIVE and SUPPRESSED unless explicitly filtered
+    if status:
+        query = query.where(func.upper(Finding.status) == status.upper().strip())
+    else:
+        query = query.where(func.upper(Finding.status).notin_(["FALSE_POSITIVE", "SUPPRESSED"]))
+
+    if severity:
+        query = query.where(func.lower(Finding.severity) == severity.lower().strip())
+    if cwe:
+        query = query.where(Finding.cwe_id.ilike(f"%{cwe.strip()}%"))
+
+    if project_id:
+        from backend.app.core.identifiers import is_valid_uuid
+        from sqlalchemy import or_
+        pid_str = str(project_id).strip()
+        if is_valid_uuid(pid_str):
+            cond = or_(Project.id == uuid.UUID(pid_str), Project.public_id == pid_str)
+        else:
+            cond = (Project.public_id == pid_str)
+        proj_stmt = select(Project.id).where(cond, Project.organization_id == org.id)
+        proj_res = await db.execute(proj_stmt)
+        resolved_pid = proj_res.scalar_one_or_none()
+        if resolved_pid is None:
+            raise NotFoundError("Project not found")
+        query = query.where(Finding.project_id == resolved_pid)
+
+    if search:
+        search_pattern = f"%{search.strip()}%"
+        query = query.where(
+            (Finding.title.ilike(search_pattern))
+            | (Finding.vulnerability_type.ilike(search_pattern))
+            | (Finding.cwe_id.ilike(search_pattern))
+            | (Project.name.ilike(search_pattern))
+        )
+
+    # Count total
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total_res = await db.execute(count_stmt)
+    total = total_res.scalar() or 0
+
+    # Sorting
+    sort_col = getattr(Finding, sort_by, Finding.risk_score)
+    if sort_order == "desc":
+        query = query.order_by(desc(sort_col))
+    else:
+        query = query.order_by(sort_col)
+
+    # Pagination & eager load project + occurrences with scan
+    query = (
+        query.offset((page - 1) * page_size)
+        .limit(page_size)
+        .options(
+            selectinload(Finding.project),
+            selectinload(Finding.occurrences).selectinload(FindingOccurrence.scan),
+            selectinload(Finding.occurrences).selectinload(FindingOccurrence.ai_prediction),
+        )
+    )
+
+    res = await db.execute(query)
+    findings = res.scalars().all()
+
+    items: list[FindingListItem] = []
+    for f in findings:
+        latest_occ = f.occurrences[0] if f.occurrences else None
+        latest_scan = latest_occ.scan if latest_occ else None
+        items.append(
+            FindingListItem(
+                id=f.id,
+                public_id=f.public_id,
+                project_id=f.project_id,
+                project_name=f.project.name if f.project else None,
+                project_public_id=f.project.public_id if f.project else None,
+                organization_id=f.organization_id,
+                title=f.title,
+                vulnerability_type=f.vulnerability_type,
+                cwe_id=f.cwe_id,
+                severity=f.severity,
+                cvss_score=f.cvss_score,
+                confidence=f.confidence,
+                risk_score=f.risk_score,
+                status=f.status,
+                fingerprint=f.fingerprint,
+                first_seen_at=f.first_seen_at,
+                last_seen_at=f.last_seen_at,
+                fixed_at=f.fixed_at,
+                latest_file_path=latest_occ.file_path if latest_occ else None,
+                latest_line_number=latest_occ.start_line if latest_occ else None,
+                latest_scan_id=latest_scan.id if latest_scan else None,
+                latest_scan_public_id=latest_scan.public_id if latest_scan else None,
+                occurrence_count=len(f.occurrences),
+            )
+        )
+
+    return paginated_response(
+        items=[item.model_dump(mode="json") for item in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+        message="Global findings retrieved successfully",
+    )
+
+
+@router.get("/findings/summary", summary="Get global findings summary")
+async def get_global_findings_summary(
+    org_context: tuple[Organization, OrganizationMember] = Depends(require_permission("finding.read")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve aggregate summary counts for active findings across the active organization."""
+    org, _ = org_context
+
+    # Query active findings excluding FALSE_POSITIVE and SUPPRESSED
+    base_query = (
+        select(func.lower(Finding.severity), func.count(func.distinct(Finding.id)))
+        .where(
+            Finding.organization_id == org.id,
+            func.upper(Finding.status).notin_(["FALSE_POSITIVE", "SUPPRESSED"]),
+        )
+        .group_by(func.lower(Finding.severity))
+    )
+    res = await db.execute(base_query)
+    sev_map = dict(res.all())
+
+    total = sum(sev_map.values())
+    summary = GlobalFindingsSummary(
+        total=total,
+        critical=sev_map.get("critical", 0),
+        high=sev_map.get("high", 0),
+        medium=sev_map.get("medium", 0),
+        low=sev_map.get("low", 0),
+        info=sev_map.get("info", 0),
+    )
+    return success_response(
+        data=summary.model_dump(mode="json"),
+        message="Global findings summary retrieved successfully",
+    )
+
+
 # ── 1. Project Findings Listing & Summary ─────────────────────
 
 
 @router.get("/projects/{project_id}/findings", summary="List project findings")
 async def list_project_findings(
-    project_id: uuid.UUID,
+    project_id: str,
     severity: str | None = Query(None),
     status: str | None = Query(None),
     cwe: str | None = Query(None),
@@ -86,15 +251,15 @@ async def list_project_findings(
     db: AsyncSession = Depends(get_db),
 ):
     """Retrieve paginated and filtered vulnerability findings for a project."""
-    _, member = project_context
+    project, member = project_context
     _verify_member_permission(member, "finding.read")
 
-    query = select(Finding).where(Finding.project_id == project_id)
+    query = select(Finding).where(Finding.project_id == project.id)
 
     if severity:
-        query = query.where(Finding.severity == severity.lower().strip())
+        query = query.where(func.lower(Finding.severity) == severity.lower().strip())
     if status:
-        query = query.where(Finding.status == status.upper().strip())
+        query = query.where(func.upper(Finding.status) == status.upper().strip())
     if cwe:
         query = query.where(Finding.cwe_id.ilike(f"%{cwe.strip()}%"))
     if search:
@@ -117,11 +282,13 @@ async def list_project_findings(
     else:
         query = query.order_by(sort_col)
 
-    # Pagination & eager load occurrences
+    # Pagination & eager load occurrences with scan
     query = (
         query.offset((page - 1) * page_size)
         .limit(page_size)
         .options(
+            selectinload(Finding.project),
+            selectinload(Finding.occurrences).selectinload(FindingOccurrence.scan),
             selectinload(Finding.occurrences).selectinload(FindingOccurrence.ai_prediction),
         )
     )
@@ -132,10 +299,14 @@ async def list_project_findings(
     items: list[FindingListItem] = []
     for f in findings:
         latest_occ = f.occurrences[0] if f.occurrences else None
+        latest_scan = latest_occ.scan if latest_occ else None
         items.append(
             FindingListItem(
                 id=f.id,
+                public_id=f.public_id,
                 project_id=f.project_id,
+                project_name=project.name,
+                project_public_id=project.public_id,
                 organization_id=f.organization_id,
                 title=f.title,
                 vulnerability_type=f.vulnerability_type,
@@ -151,6 +322,8 @@ async def list_project_findings(
                 fixed_at=f.fixed_at,
                 latest_file_path=latest_occ.file_path if latest_occ else None,
                 latest_line_number=latest_occ.start_line if latest_occ else None,
+                latest_scan_id=latest_scan.id if latest_scan else None,
+                latest_scan_public_id=latest_scan.public_id if latest_scan else None,
                 occurrence_count=len(f.occurrences),
             )
         )
@@ -166,15 +339,15 @@ async def list_project_findings(
 
 @router.get("/projects/{project_id}/findings/summary", summary="Get project findings summary")
 async def get_project_findings_summary(
-    project_id: uuid.UUID,
+    project_id: str,
     project_context: tuple[Project, OrganizationMember] = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
 ):
     """Get aggregated severity and lifecycle status statistics for project findings."""
-    _, member = project_context
+    project, member = project_context
     _verify_member_permission(member, "finding.read")
 
-    stmt = select(Finding.severity, Finding.status).where(Finding.project_id == project_id)
+    stmt = select(Finding.severity, Finding.status).where(Finding.project_id == project.id)
     res = await db.execute(stmt)
     rows = res.all()
 
@@ -217,19 +390,21 @@ async def get_project_findings_summary(
 
 @router.get("/scans/{scan_id}/findings", summary="Get findings observed in a scan")
 async def get_scan_findings(
-    scan_id: uuid.UUID,
+    scan_id: str,
     scan_context: tuple[Scan, Project, OrganizationMember] = Depends(require_scan_access),
     db: AsyncSession = Depends(get_db),
 ):
     """List all findings observed in a particular scan via their occurrences."""
-    _, _, member = scan_context
+    scan, project, member = scan_context
     _verify_member_permission(member, "finding.read")
 
     stmt = (
         select(Finding)
         .join(FindingOccurrence, FindingOccurrence.finding_id == Finding.id)
-        .where(FindingOccurrence.scan_id == scan_id)
+        .where(FindingOccurrence.scan_id == scan.id)
         .options(
+            selectinload(Finding.project),
+            selectinload(Finding.occurrences).selectinload(FindingOccurrence.scan),
             selectinload(Finding.occurrences).selectinload(FindingOccurrence.ai_prediction),
         )
         .distinct()
@@ -240,7 +415,10 @@ async def get_scan_findings(
     items = [
         FindingListItem(
             id=f.id,
+            public_id=f.public_id,
             project_id=f.project_id,
+            project_name=project.name,
+            project_public_id=project.public_id,
             organization_id=f.organization_id,
             title=f.title,
             vulnerability_type=f.vulnerability_type,
@@ -256,6 +434,8 @@ async def get_scan_findings(
             fixed_at=f.fixed_at,
             latest_file_path=f.occurrences[0].file_path if f.occurrences else None,
             latest_line_number=f.occurrences[0].start_line if f.occurrences else None,
+            latest_scan_id=scan.id,
+            latest_scan_public_id=scan.public_id,
             occurrence_count=len(f.occurrences),
         ).model_dump(mode="json")
         for f in findings
@@ -269,7 +449,7 @@ async def get_scan_findings(
 
 @router.get("/findings/{finding_id}", summary="Get finding detail")
 async def get_finding_detail(
-    finding_id: uuid.UUID,
+    finding_id: str,
     finding_context: tuple[Finding, Project, OrganizationMember] = Depends(require_finding_access),
     db: AsyncSession = Depends(get_db),
 ):
@@ -279,7 +459,7 @@ async def get_finding_detail(
     # Eager load related domain entities
     stmt = (
         select(Finding)
-        .where(Finding.id == finding_id)
+        .where(Finding.id == finding.id)
         .options(
             selectinload(Finding.occurrences).selectinload(FindingOccurrence.ai_prediction),
             selectinload(Finding.status_history),
@@ -296,9 +476,14 @@ async def get_finding_detail(
     ]
     latest_occ = occurrences_data[0] if occurrences_data else None
 
+    finding, project, _ = finding_context
+
     detail = FindingDetailResponse(
         id=loaded_finding.id,
+        public_id=loaded_finding.public_id,
         project_id=loaded_finding.project_id,
+        project_public_id=project.public_id,
+        project_name=project.name,
         organization_id=loaded_finding.organization_id,
         title=loaded_finding.title,
         vulnerability_type=loaded_finding.vulnerability_type,

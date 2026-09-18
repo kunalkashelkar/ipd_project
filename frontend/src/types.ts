@@ -90,6 +90,7 @@ export interface ApiKeyMetadata {
 
 export interface Project {
   id: string;
+  public_id: string;
   name: string;
   description: string | null;
   language: string | null;
@@ -142,11 +143,16 @@ export type ScanStatus =
 
 export interface Scan {
   id: string;
+  public_id: string;
   project_id: string;
+  project_name?: string | null;
+  project_public_id?: string | null;
   organization_id?: string | null;
   upload_id: string | null;
   repository_id: string | null;
   source_snapshot_id?: string | null;
+  source_snapshot_version?: string | null;
+  source_snapshot_public_id?: string | null;
   user_id?: string;
   status: ScanStatus;
   progress: number;
@@ -293,6 +299,7 @@ export type PreprocessingStatus = 'pending' | 'completed' | 'failed' | 'skipped'
 
 export interface SourceSnapshot {
   id: string;
+  public_id: string;
   project_id: string;
   repository_id: string | null;
   repository_commit_id: string | null;
@@ -402,6 +409,7 @@ export interface Vulnerability {
 
 export interface Report {
   id: string;
+  public_id: string;
   scan_id: string;
   format: string;
   status: string;
@@ -466,4 +474,8 @@ export interface PaginatedResponse<T> {
 
 // ── Phase 5 Findings ─────────────────────────────────────────
 export * from './types/finding';
+
+// ── Phase 6 Remediation & XAI ────────────────────────────────
+export * from './types/remediation';
+
 

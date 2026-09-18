@@ -25,6 +25,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Alert } from '../../components/ui/Alert';
 import { snapshotService } from '../../services/snapshotService';
 import { repositoryService } from '../../services/repositoryService';
+import { getProjectUrl, getSnapshotUrl } from '../../utils/routes';
 import toast from 'react-hot-toast';
 
 export default function ConnectRepo() {
@@ -77,7 +78,7 @@ export default function ConnectRepo() {
         }
       );
       toast.success('Archive uploaded. Source snapshot queued for processing!');
-      navigate(`/projects/${projectId}/snapshots/${snapshot.id}`);
+      navigate(getSnapshotUrl(projectId, snapshot));
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to upload ZIP archive');
     } finally {
@@ -106,7 +107,7 @@ export default function ConnectRepo() {
         }
       );
       toast.success(`${sourceFiles.length} files uploaded to snapshot!`);
-      navigate(`/projects/${projectId}/snapshots/${snapshot.id}`);
+      navigate(getSnapshotUrl(projectId, snapshot));
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to upload source files');
     } finally {
@@ -131,7 +132,7 @@ export default function ConnectRepo() {
         default_branch: gitBranch.trim() || undefined,
       });
       toast.success(`Git repository '${repo.display_name}' connected and sync queued!`);
-      navigate(`/projects/${projectId}?tab=repositories`);
+      navigate(`${getProjectUrl(projectId)}?tab=repositories`);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to connect Git repository');
     } finally {
@@ -156,7 +157,7 @@ export default function ConnectRepo() {
         default_branch: githubBranch.trim() || undefined,
       });
       toast.success(`GitHub repository '${repo.display_name}' connected and sync queued!`);
-      navigate(`/projects/${projectId}?tab=repositories`);
+      navigate(`${getProjectUrl(projectId)}?tab=repositories`);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to connect GitHub repository');
     } finally {
@@ -171,7 +172,7 @@ export default function ConnectRepo() {
           <Breadcrumbs
             items={[
               { label: 'Projects', to: '/projects' },
-              { label: 'Project', to: projectId ? `/projects/${projectId}` : '/projects' },
+              { label: 'Project', to: projectId ? getProjectUrl(projectId) : '/projects' },
               { label: 'Connect Source' },
             ]}
           />

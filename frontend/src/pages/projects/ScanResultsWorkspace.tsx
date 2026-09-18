@@ -12,7 +12,14 @@
 // ============================================================
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, useLocation, useNavigate, Link } from 'react-router-dom';
+import {
+  getResultsUrl,
+  getProjectUrl,
+  toProjectSlug,
+  toScanSlug,
+  toFindingSlug,
+} from '../../utils/routes';
 import {
   ArrowLeft,
   Network,
@@ -41,6 +48,13 @@ import {
   User,
   Tag,
   Flame,
+  FileDiff,
+  Terminal,
+  RotateCw,
+  Check,
+  X,
+  Cpu,
+  Play,
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -48,6 +62,7 @@ import { Button } from '../../components/ui/Button';
 import { scanService } from '../../services/scanService';
 import { findingService } from '../../services/findingService';
 import { projectService } from '../../services/projectService';
+import { remediationService } from '../../services/remediationService';
 import {
   Scan,
   AnalysisArtifact,
@@ -57,8 +72,13 @@ import {
   FindingDetail,
   FindingSourceContext,
   Project,
+  AIExplanation,
+  Remediation,
+  RemediationValidation,
+  VerificationStatus,
 } from '../../types';
 import toast from 'react-hot-toast';
+
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   OPEN: ['CONFIRMED', 'IN_PROGRESS', 'FALSE_POSITIVE', 'RISK_ACCEPTED', 'SUPPRESSED'],
@@ -75,10 +95,12 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 };
 
 export default function ScanResultsWorkspace() {
-  const params = useParams<{ id?: string; projectId?: string }>();
+  const params = useParams<{ id?: string; projectId?: string; scanId?: string }>();
   const id = params.projectId || params.id;
   const [searchParams] = useSearchParams();
-  const scanId = searchParams.get('scan_id');
+  const scanId = params.scanId || searchParams.get('scan') || searchParams.get('scan_id');
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Project data for truthful breadcrumbs and navigation
   const [project, setProject] = useState<Project | null>(null);
@@ -100,8 +122,25 @@ export default function ScanResultsWorkspace() {
   const [loadingSource, setLoadingSource] = useState(false);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'findings' | 'graphs' | 'taint'>('findings');
   const [findingSubTab, setFindingSubTab] = useState<
-    'overview' | 'source' | 'taint' | 'graphs' | 'ai' | 'occurrences' | 'comments'
+    'overview' | 'source' | 'taint' | 'graphs' | 'ai' | 'explanation' | 'remediation' | 'occurrences' | 'comments'
   >('overview');
+
+
+  // Phase 6 XAI & Remediation state
+  const [explanations, setExplanations] = useState<AIExplanation[]>([]);
+  const [selectedExplanationMethod, setSelectedExplanationMethod] = useState<string>('evidence_synthesizer');
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
+  const [generatingExplanation, setGeneratingExplanation] = useState(false);
+
+  const [remediations, setRemediations] = useState<Remediation[]>([]);
+  const [selectedRemediationId, setSelectedRemediationId] = useState<string | null>(null);
+  const [loadingRemediation, setLoadingRemediation] = useState(false);
+  const [generatingRemediation, setGeneratingRemediation] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [runSandboxTests, setRunSandboxTests] = useState(true);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
+
 
   // Filter & search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,6 +170,20 @@ export default function ScanResultsWorkspace() {
     }
   }, [id]);
 
+  // Canonical URL synchronization & backward compatibility redirect
+  useEffect(() => {
+    if (!project || !scan) return;
+    const canonicalProj = toProjectSlug(project);
+    const canonicalScan = toScanSlug(scan);
+    const canonicalPath = `/projects/${canonicalProj}/scans/${canonicalScan}/results`;
+    const findingParam = searchParams.get('finding') || searchParams.get('finding_id');
+    const expectedSearch = findingParam ? `?finding=${findingParam}` : '';
+
+    if (location.pathname !== canonicalPath || (findingParam && !searchParams.has('finding'))) {
+      navigate(`${canonicalPath}${expectedSearch}`, { replace: true });
+    }
+  }, [project, scan, location.pathname, searchParams, navigate]);
+
   useEffect(() => {
     if (!scanId) return;
 
@@ -154,7 +207,17 @@ export default function ScanResultsWorkspace() {
         }
         if (findingsRes.status === 'fulfilled') {
           setFindings(findingsRes.value);
-          if (findingsRes.value.length > 0) {
+          const findingQuery = searchParams.get('finding') || searchParams.get('finding_id');
+          if (findingQuery) {
+            const match = findingsRes.value.find(
+              (f) => f.public_id === findingQuery || f.id === findingQuery
+            );
+            if (match) {
+              setSelectedFindingId(match.id);
+            } else if (findingsRes.value.length > 0) {
+              setSelectedFindingId(findingsRes.value[0].id);
+            }
+          } else if (findingsRes.value.length > 0) {
             setSelectedFindingId(findingsRes.value[0].id);
           }
         }
@@ -181,12 +244,31 @@ export default function ScanResultsWorkspace() {
       try {
         const detail = await findingService.getFindingDetail(selectedFindingId!);
         setFindingDetail(detail);
+
+        // Fetch Phase 6 explanations, remediations & verification
+        remediationService.getFindingExplanations(selectedFindingId!).then((exps) => {
+          setExplanations(exps);
+        }).catch(() => setExplanations([]));
+
+        remediationService.getFindingRemediations(selectedFindingId!).then((rems) => {
+          setRemediations(rems);
+          if (rems.length > 0) {
+            setSelectedRemediationId(rems[0].id);
+          } else {
+            setSelectedRemediationId(null);
+          }
+        }).catch(() => setRemediations([]));
+
+        remediationService.getFindingVerification(selectedFindingId!).then((v) => {
+          setVerificationStatus(v);
+        }).catch(() => setVerificationStatus(null));
       } catch {
         toast.error('Failed to load finding details');
       } finally {
         setLoadingDetail(false);
       }
     }
+
 
     loadDetail();
   }, [selectedFindingId]);
@@ -350,7 +432,120 @@ export default function ScanResultsWorkspace() {
     }
   };
 
+  // ── Phase 6 Remediation & XAI Handlers ───────────────────────
+  const handleGenerateExplanation = async (method: string) => {
+    if (!selectedFindingId) return;
+    setGeneratingExplanation(true);
+    try {
+      const exp = await remediationService.generateFindingExplanation(selectedFindingId, method);
+      setExplanations((prev) => [exp, ...prev.filter((e) => e.id !== exp.id)]);
+      toast.success(`Generated explanation via ${method}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to generate explanation');
+    } finally {
+      setGeneratingExplanation(false);
+    }
+  };
+
+  const handleGenerateRemediation = async () => {
+    if (!selectedFindingId) return;
+    setGeneratingRemediation(true);
+    try {
+      const rem = await remediationService.generateFindingRemediation(selectedFindingId, 'v1.0.0');
+      setRemediations((prev) => [rem, ...prev.filter((r) => r.id !== rem.id)]);
+      setSelectedRemediationId(rem.id);
+      toast.success('Proposed remediation generated');
+      const updated = await findingService.getFindingDetail(selectedFindingId);
+      setFindingDetail(updated);
+      setFindings((prev) =>
+        prev.map((f) => (f.id === selectedFindingId ? { ...f, status: updated.status } : f))
+      );
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to generate remediation');
+    } finally {
+      setGeneratingRemediation(false);
+    }
+  };
+
+  const handleReviewRemediation = async (decision: 'APPROVE' | 'REJECT') => {
+    if (!selectedRemediationId || !selectedFindingId) return;
+    setActionInProgress(true);
+    try {
+      const updatedRem = await remediationService.reviewRemediation(
+        selectedRemediationId,
+        decision,
+        reviewComment.trim() || undefined
+      );
+      setRemediations((prev) =>
+        prev.map((r) => (r.id === updatedRem.id ? updatedRem : r))
+      );
+      setReviewComment('');
+      toast.success(`Remediation ${decision.toLowerCase()}d`);
+      const updated = await findingService.getFindingDetail(selectedFindingId);
+      setFindingDetail(updated);
+      setFindings((prev) =>
+        prev.map((f) => (f.id === selectedFindingId ? { ...f, status: updated.status } : f))
+      );
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || `Failed to ${decision.toLowerCase()} remediation`);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleApplyRemediation = async () => {
+    if (!selectedRemediationId || !selectedFindingId) return;
+    setActionInProgress(true);
+    try {
+      const appliedRem = await remediationService.applyRemediation(selectedRemediationId);
+      setRemediations((prev) =>
+        prev.map((r) => (r.id === appliedRem.id ? appliedRem : r))
+      );
+      toast.success('Patch applied to isolated validation workspace');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to apply patch');
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleValidateRemediation = async () => {
+    if (!selectedRemediationId || !selectedFindingId) return;
+    setActionInProgress(true);
+    try {
+      const valResult = await remediationService.validateRemediation(
+        selectedRemediationId,
+        runSandboxTests,
+        'v1.0.0'
+      );
+      const freshRem = await remediationService.getRemediationDetail(selectedRemediationId);
+      setRemediations((prev) =>
+        prev.map((r) => (r.id === freshRem.id ? freshRem : r))
+      );
+
+      const vStatus = await remediationService.getFindingVerification(selectedFindingId);
+      setVerificationStatus(vStatus);
+
+      const freshFinding = await findingService.getFindingDetail(selectedFindingId);
+      setFindingDetail(freshFinding);
+      setFindings((prev) =>
+        prev.map((f) => (f.id === selectedFindingId ? { ...f, status: freshFinding.status } : f))
+      );
+
+      if (valResult.final_verification_result === 'VERIFIED') {
+        toast.success('Finding verified! Patch resolved vulnerability.');
+      } else {
+        toast.error(`Validation ${valResult.status}: ${valResult.failure_reason || 'Fix not verified'}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Validation execution failed');
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
   const canonicalGraphs = artifacts.filter((a) => a.artifact_type !== 'TAINT');
+
   const taintArtifact = artifacts.find((a) => a.artifact_type === 'TAINT');
 
   if (loading) {
@@ -367,7 +562,7 @@ export default function ScanResultsWorkspace() {
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
         <p className="text-muted-foreground">Scan not found.</p>
-        <Link to={`/projects/${id}`}>
+        <Link to={getProjectUrl(project || id)}>
           <Button className="mt-4">Back to Project</Button>
         </Link>
       </div>
@@ -386,18 +581,18 @@ export default function ScanResultsWorkspace() {
             </Link>
             <ChevronRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
             <Link
-              to={`/projects/${id}`}
+              to={getProjectUrl(project || id)}
               className="hover:text-foreground font-medium text-foreground transition-colors truncate max-w-[220px]"
-              title={project?.name || id}
+              title={project?.name || toProjectSlug(project || id)}
             >
-              {project?.name || id?.slice(0, 8)}
+              {project?.name || toProjectSlug(project || id)}
             </Link>
             <ChevronRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
             <span className="text-muted-foreground">Results</span>
           </div>
 
           <Link
-            to={`/projects/${id}`}
+            to={getProjectUrl(project || id)}
             className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 mb-2 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to {project?.name || 'Project'}
@@ -412,9 +607,9 @@ export default function ScanResultsWorkspace() {
             </Badge>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1 font-mono">
-            <span>Scan: {scanId.slice(0, 8)}</span>
+            <span>Scan: {scan.public_id || scanId}</span>
             <span>•</span>
-            <span>Snapshot: {scan.source_snapshot_id ? scan.source_snapshot_id.slice(0, 8) : 'N/A'}</span>
+            <span>Snapshot: {scan.source_snapshot_public_id || (scan.source_snapshot_id ? scan.source_snapshot_id.slice(0, 8) : 'N/A')}</span>
             {scan.ai_model_version && (
               <>
                 <span>•</span>
@@ -630,6 +825,11 @@ export default function ScanResultsWorkspace() {
                                   {f.cwe_id}
                                 </span>
                               )}
+                              {f.public_id && (
+                                <span className="text-[10px] font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                                  {f.public_id}
+                                </span>
+                              )}
                               <span className="text-[10px] font-mono text-muted-foreground bg-muted/30 px-1 rounded">
                                 {f.status}
                               </span>
@@ -701,6 +901,9 @@ export default function ScanResultsWorkspace() {
                                 {findingDetail.cwe_id}
                               </span>
                             )}
+                            <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-2 py-0.5 rounded">
+                              {findingDetail.public_id || findingDetail.id}
+                            </span>
                             <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted/50 text-foreground font-semibold">
                               Status: {findingDetail.status}
                             </span>
@@ -846,6 +1049,27 @@ export default function ScanResultsWorkspace() {
                       >
                         <Sparkles className="w-3.5 h-3.5" /> AI Provenance
                       </button>
+                      <button
+                        onClick={() => setFindingSubTab('explanation')}
+                        className={`px-3 py-1.5 border-b-2 font-medium transition-all flex items-center gap-1 ${
+                          findingSubTab === 'explanation'
+                            ? 'border-primary text-foreground font-semibold'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Cpu className="w-3.5 h-3.5" /> AI Explanation
+                      </button>
+                      <button
+                        onClick={() => setFindingSubTab('remediation')}
+                        className={`px-3 py-1.5 border-b-2 font-medium transition-all flex items-center gap-1 ${
+                          findingSubTab === 'remediation'
+                            ? 'border-primary text-foreground font-semibold'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" /> Remediation & Verification
+                      </button>
+
                       <button
                         onClick={() => setFindingSubTab('occurrences')}
                         className={`px-3 py-1.5 border-b-2 font-medium transition-all flex items-center gap-1 ${
@@ -1247,7 +1471,545 @@ export default function ScanResultsWorkspace() {
                         </form>
                       </div>
                     )}
+
+                    {/* Sub-tab 7: Evidence-Aware AI Explanation & XAI Attribution */}
+                    {findingSubTab === 'explanation' && (
+                      <div className="space-y-4 text-xs">
+                        {/* Evidence vs Interpretation Notice */}
+                        <div className="p-3 rounded-lg border border-border/80 bg-muted/20 flex items-start gap-2.5">
+                          <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <span className="font-semibold text-foreground">
+                              Evidence-Aware Explainability & Attribution
+                            </span>
+                            <p className="text-muted-foreground leading-relaxed">
+                              Deterministic evidence (AST sinks, taint flows, canonical graphs) provides the ground truth.
+                              XAI methods generate model-derived attribution and interpretation.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Method Selector & Trigger */}
+                        <div className="p-3 rounded-lg border border-border/60 bg-card/40 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground font-medium">Method:</span>
+                            <select
+                              value={selectedExplanationMethod}
+                              onChange={(e) => setSelectedExplanationMethod(e.target.value)}
+                              className="text-xs bg-muted/40 border border-border rounded px-2.5 py-1 text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                            >
+                              <option value="evidence_synthesizer">Evidence-Aware Synthesizer (Default)</option>
+                              <option value="integrated_gradients">Captum / Integrated Gradients</option>
+                              <option value="shap">SHAP (Tree/Kernel Attribution)</option>
+                              <option value="gnn_explainer">GNNExplainer (Graph Subgraph)</option>
+                              <option value="attention">Transformer Attention</option>
+                            </select>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleGenerateExplanation(selectedExplanationMethod)}
+                            disabled={generatingExplanation}
+                            className="gap-1.5"
+                          >
+                            <Cpu className="w-3.5 h-3.5" />
+                            {generatingExplanation ? 'Generating...' : 'Generate Explanation'}
+                          </Button>
+                        </div>
+
+                        {/* Explanations List / Active Explanation */}
+                        {explanations.length === 0 ? (
+                          <div className="p-8 text-center text-muted-foreground border border-border/40 rounded-lg">
+                            No AI explanations generated for this finding yet. Select a method above and click "Generate Explanation".
+                          </div>
+                        ) : (
+                          explanations.map((exp) => (
+                            <div
+                              key={exp.id}
+                              className="p-4 rounded-lg border border-border/80 bg-card/60 space-y-3"
+                            >
+                              {/* Header & Status */}
+                              <div className="flex items-center justify-between border-b border-border/40 pb-2 flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                                    {exp.explanation_method}
+                                  </Badge>
+                                  <span
+                                    className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                      exp.method_status === 'SUPPORTED'
+                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    }`}
+                                  >
+                                    {exp.method_status}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {exp.provider} • {exp.model_name}:{exp.model_version} • {new Date(exp.created_at).toLocaleTimeString()}
+                                </span>
+                              </div>
+
+                              {/* Method Status Reason if Not Supported */}
+                              {exp.method_status !== 'SUPPORTED' && exp.status_reason && (
+                                <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+                                  <p className="font-semibold mb-0.5">Method Limitation / Status Notice:</p>
+                                  <p>{exp.status_reason}</p>
+                                </div>
+                              )}
+
+                              {/* Summary & Analysis */}
+                              <div className="space-y-2">
+                                <div>
+                                  <span className="font-semibold text-foreground block">Executive Summary:</span>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5">{exp.summary}</p>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-foreground block">Root Cause Analysis:</span>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5">{exp.root_cause}</p>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-foreground block">Why Code is Vulnerable:</span>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5">{exp.why_vulnerable}</p>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-foreground block">Security Impact:</span>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5">{exp.impact}</p>
+                                </div>
+                                <div>
+                                  <span className="font-semibold text-foreground block">Evidence Synthesis:</span>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5">{exp.evidence_explanation}</p>
+                                </div>
+                              </div>
+
+                              {/* Normalized Attributions: Important Locations */}
+                              {exp.important_locations && exp.important_locations.length > 0 && (
+                                <div className="pt-2 border-t border-border/40 space-y-2">
+                                  <span className="font-semibold text-foreground block">
+                                    Attributed Source Locations ({exp.important_locations.length}):
+                                  </span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {exp.important_locations.map((loc, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-2.5 rounded border border-border/60 bg-muted/20 flex items-center justify-between"
+                                      >
+                                        <div className="font-mono truncate max-w-[220px]">
+                                          <span className="text-foreground">{loc.file}</span>:
+                                          <span className="text-primary font-bold">L{loc.start_line}-L{loc.end_line}</span>
+                                          <span className="text-[10px] text-muted-foreground block">
+                                            Importance: {(loc.importance * 100).toFixed(1)}%
+                                          </span>
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-6 px-2 text-[10px]"
+                                          onClick={() => setFindingSubTab('source')}
+                                        >
+                                          View Code
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Important Tokens */}
+                              {exp.important_tokens && exp.important_tokens.length > 0 && (
+                                <div className="pt-2 border-t border-border/40 space-y-1.5">
+                                  <span className="font-semibold text-foreground block">
+                                    Attributed Tokens ({exp.important_tokens.length}):
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {exp.important_tokens.map((tok, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-0.5 rounded bg-muted/40 border border-border/60 font-mono text-[11px] text-foreground"
+                                      >
+                                        <span className="text-amber-400 font-bold">{tok.token}</span>
+                                        <span className="text-muted-foreground ml-1.5 text-[10px]">
+                                          ({Math.round(tok.importance * 100)}%)
+                                        </span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Important Graph Nodes */}
+                              {exp.important_nodes && exp.important_nodes.length > 0 && (
+                                <div className="pt-2 border-t border-border/40 space-y-1.5">
+                                  <span className="font-semibold text-foreground block">
+                                    Important Graph Nodes ({exp.important_nodes.length}):
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {exp.important_nodes.map((node, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-0.5 rounded bg-muted/40 border border-border/60 font-mono text-[11px]"
+                                      >
+                                        <span className="text-primary">{node.label}</span>
+                                        <span className="text-muted-foreground ml-1 text-[10px]">
+                                          [{node.node_type}] ({Math.round(node.importance * 100)}%)
+                                        </span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* Sub-tab 8: LLM Remediation & Isolated Validation */}
+                    {findingSubTab === 'remediation' && (
+                      <div className="space-y-4 text-xs">
+                        {/* Core Invariant Banner */}
+                        <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 flex items-start gap-2.5">
+                          <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <span className="font-semibold text-amber-300">
+                              Core Security Principle: AI-generated fix != verified fix
+                            </span>
+                            <p className="text-muted-foreground leading-relaxed">
+                              Remediations are proposed unified diff patches applied strictly inside disposable isolated workspaces.
+                              A finding is marked FIXED only after approved validation, and marked VERIFIED only after an authoritative
+                              verification scan proves resolution without regressions.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Top Action Bar & Remediation Selector */}
+                        <div className="p-3 rounded-lg border border-border/60 bg-card/40 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground font-medium">Remediations:</span>
+                            {remediations.length > 0 ? (
+                              <select
+                                value={selectedRemediationId || ''}
+                                onChange={(e) => setSelectedRemediationId(e.target.value)}
+                                className="text-xs bg-muted/40 border border-border rounded px-2.5 py-1 text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                              >
+                                {remediations.map((r) => (
+                                  <option key={r.id} value={r.id}>
+                                    Remediation #{r.remediation_number} ({r.status})
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-muted-foreground font-mono">None generated</span>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={handleGenerateRemediation}
+                            disabled={generatingRemediation}
+                            className="gap-1.5"
+                          >
+                            <FileDiff className="w-3.5 h-3.5" />
+                            {generatingRemediation ? 'Generating Fix...' : 'Generate Secure Fix'}
+                          </Button>
+                        </div>
+
+                        {/* Active Remediation Content */}
+                        {(() => {
+                          const activeRem = remediations.find((r) => r.id === selectedRemediationId) || remediations[0];
+                          if (!activeRem) {
+                            return (
+                              <div className="p-8 text-center text-muted-foreground border border-border/40 rounded-lg">
+                                No remediation proposals available. Click "Generate Secure Fix" to propose an automated security patch.
+                              </div>
+                            );
+                          }
+
+                          const latestVal = activeRem.validations && activeRem.validations.length > 0 ? activeRem.validations[0] : null;
+
+                          return (
+                            <div className="space-y-4">
+                              {/* Remediation Summary Card */}
+                              <div className="p-4 rounded-lg border border-border/80 bg-card/60 space-y-3">
+                                <div className="flex items-center justify-between border-b border-border/40 pb-2 flex-wrap gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-foreground">
+                                      Remediation #{activeRem.remediation_number}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={`font-mono text-[10px] ${
+                                        activeRem.status === 'VALIDATED'
+                                          ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                                          : activeRem.status === 'FAILED_VALIDATION'
+                                          ? 'text-red-400 border-red-500/40 bg-red-500/10'
+                                          : activeRem.status === 'APPROVED'
+                                          ? 'text-blue-400 border-blue-500/40 bg-blue-500/10'
+                                          : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                                      }`}
+                                    >
+                                      {activeRem.status}
+                                    </Badge>
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    {activeRem.provider} • SHA-256: {activeRem.patch_checksum.substring(0, 12)}...
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <p className="font-semibold text-foreground">{activeRem.summary}</p>
+                                  <p className="text-muted-foreground leading-relaxed">{activeRem.explanation}</p>
+                                </div>
+
+                                {activeRem.changed_files && activeRem.changed_files.length > 0 && (
+                                  <div className="text-[11px] font-mono">
+                                    <span className="text-muted-foreground">Target Files: </span>
+                                    <span className="text-foreground">{activeRem.changed_files.join(', ')}</span>
+                                  </div>
+                                )}
+
+                                {/* Unified Diff Viewer */}
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="font-semibold text-foreground flex items-center gap-1.5">
+                                    <Terminal className="w-3.5 h-3.5 text-primary" /> Unified Diff Patch
+                                  </span>
+                                  <pre className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-[11px] font-mono overflow-x-auto max-h-[300px] leading-relaxed select-text">
+                                    {activeRem.diff_content.split('\n').map((line, idx) => {
+                                      const isAdd = line.startsWith('+') && !line.startsWith('+++');
+                                      const isDel = line.startsWith('-') && !line.startsWith('---');
+                                      const isHunk = line.startsWith('@@');
+                                      return (
+                                        <div
+                                          key={idx}
+                                          className={
+                                            isAdd
+                                              ? 'text-emerald-400 bg-emerald-500/10 -mx-3 px-3'
+                                              : isDel
+                                              ? 'text-red-400 bg-red-500/10 -mx-3 px-3'
+                                              : isHunk
+                                              ? 'text-cyan-400 bg-cyan-500/10 -mx-3 px-3'
+                                              : 'text-zinc-400'
+                                          }
+                                        >
+                                          {line}
+                                        </div>
+                                      );
+                                    })}
+                                  </pre>
+                                </div>
+
+                                {/* Human Review Actions */}
+                                {(activeRem.status === 'GENERATED' || activeRem.status === 'PROPOSED') && (
+                                  <div className="p-3 rounded border border-border/60 bg-muted/20 space-y-2">
+                                    <span className="font-semibold text-foreground block">Human Review & Decision:</span>
+                                    <input
+                                      type="text"
+                                      placeholder="Optional review justification or comment..."
+                                      value={reviewComment}
+                                      onChange={(e) => setReviewComment(e.target.value)}
+                                      className="w-full px-2.5 py-1 text-xs rounded border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                    />
+                                    <div className="flex items-center gap-2 pt-1">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleReviewRemediation('APPROVE')}
+                                        disabled={actionInProgress}
+                                        className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      >
+                                        <Check className="w-3.5 h-3.5" /> Approve Remediation
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleReviewRemediation('REJECT')}
+                                        disabled={actionInProgress}
+                                        className="gap-1 text-red-400 hover:text-red-300"
+                                      >
+                                        <X className="w-3.5 h-3.5" /> Reject Remediation
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Apply to Sandbox Action */}
+                                {activeRem.status === 'APPROVED' && (
+                                  <div className="p-3 rounded border border-border/60 bg-muted/20 flex items-center justify-between">
+                                    <div>
+                                      <span className="font-semibold text-foreground block">Remediation Approved</span>
+                                      <span className="text-muted-foreground text-[11px]">
+                                        Apply diff to a fresh isolated validation workspace.
+                                      </span>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={handleApplyRemediation}
+                                      disabled={actionInProgress}
+                                      className="gap-1.5"
+                                    >
+                                      <Play className="w-3.5 h-3.5" /> Apply to Sandbox
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Validation Trigger Action */}
+                                {(activeRem.status === 'APPLIED' ||
+                                  activeRem.status === 'VALIDATED' ||
+                                  activeRem.status === 'FAILED_VALIDATION') && (
+                                  <div className="p-3 rounded border border-border/60 bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        id="run-tests-cb"
+                                        checked={runSandboxTests}
+                                        onChange={(e) => setRunSandboxTests(e.target.checked)}
+                                        className="rounded border-border text-primary focus:ring-primary cursor-pointer"
+                                      />
+                                      <label htmlFor="run-tests-cb" className="text-foreground cursor-pointer font-medium">
+                                        Execute Sandbox Allowlisted Tests
+                                      </label>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      onClick={handleValidateRemediation}
+                                      disabled={actionInProgress}
+                                      className="gap-1.5"
+                                    >
+                                      <RotateCw className="w-3.5 h-3.5" />
+                                      {actionInProgress ? 'Validating...' : 'Run Multi-Stage Validation'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Multi-Stage Validation Stepper Results */}
+                              {latestVal && (
+                                <div className="p-4 rounded-lg border border-border/80 bg-card/60 space-y-3">
+                                  <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                                    <span className="font-bold text-foreground">
+                                      Validation Attempt #{latestVal.attempt_number} Results
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={`font-mono text-[10px] ${
+                                        latestVal.status === 'PASSED'
+                                          ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                                          : latestVal.status === 'FAILED'
+                                          ? 'text-red-400 border-red-500/40 bg-red-500/10'
+                                          : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                                      }`}
+                                    >
+                                      {latestVal.status}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">1. Patch Apply</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.patch_apply_result?.status || 'PENDING'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">2. Syntax Check</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.syntax_result?.status || 'PENDING'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">3. Build Verification</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.build_result?.status || 'NOT_CONFIGURED'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">4. Allowlisted Tests</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.test_result?.status || 'NOT_CONFIGURED'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">5. Static Re-analysis</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.static_analysis_result?.status || 'PENDING'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">6. Taint / Graph Check</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.taint_result?.status || 'UNSUPPORTED'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">7. Security Regression</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.regression_result?.status || 'PASS'}
+                                      </span>
+                                    </div>
+                                    <div className="p-2.5 rounded border border-border/60 bg-muted/20">
+                                      <span className="text-muted-foreground block text-[10px]">8. Verification Scan</span>
+                                      <span className="font-bold text-foreground font-mono">
+                                        {latestVal.final_verification_result}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Authoritative Verification Outcome Banner */}
+                                  {latestVal.final_verification_result === 'VERIFIED' ? (
+                                    <div className="p-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 flex items-center gap-2.5 text-emerald-400">
+                                      <ShieldCheck className="w-5 h-5 shrink-0" />
+                                      <div>
+                                        <span className="font-bold block">Finding Verified (VERIFIED)</span>
+                                        <span className="text-emerald-300 text-[11px]">
+                                          Authoritative verification scan confirmed vulnerability resolution with zero security regressions.
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : latestVal.final_verification_result === 'NOT_VERIFIED' ? (
+                                    <div className="p-3 rounded-lg border border-red-500/40 bg-red-500/10 flex items-center gap-2.5 text-red-400">
+                                      <ShieldAlert className="w-5 h-5 shrink-0" />
+                                      <div>
+                                        <span className="font-bold block">Fix Not Verified</span>
+                                        <span className="text-red-300 text-[11px]">
+                                          {latestVal.failure_reason || 'Validation checks or verification scan failed.'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
+
+                              {/* Validation History List */}
+                              {activeRem.validations && activeRem.validations.length > 1 && (
+                                <div className="space-y-2 pt-2 border-t border-border/40">
+                                  <span className="font-semibold text-foreground block">
+                                    Validation History ({activeRem.validations.length} attempts):
+                                  </span>
+                                  <div className="space-y-1.5">
+                                    {activeRem.validations.map((v) => (
+                                      <div
+                                        key={v.id}
+                                        className="p-2.5 rounded border border-border/60 bg-muted/20 flex items-center justify-between text-xs"
+                                      >
+                                        <div className="font-mono">
+                                          <span className="font-bold text-foreground">Attempt #{v.attempt_number}</span>: {v.status}
+                                          {v.failure_reason && (
+                                            <span className="text-red-400 block text-[11px] font-sans">
+                                              {v.failure_reason}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground font-mono">
+                                          {new Date(v.started_at).toLocaleTimeString()}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </Card>
+
                 ) : (
                   <div className="p-12 text-center text-muted-foreground border border-border/40 rounded-xl bg-card/20">
                     Select a finding from the list to investigate.

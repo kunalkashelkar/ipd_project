@@ -25,14 +25,19 @@ export function TopBar() {
 
   // Fetch human-readable project name for breadcrumb when navigating project routes
   useEffect(() => {
-    if (paths[0] === 'projects' && paths[1] && isUuid(paths[1])) {
-      const projectId = paths[1];
-      if (!projectNames[projectId]) {
+    if (paths[0] === 'projects' && paths[1] && paths[1] !== 'create') {
+      const projectSlug = paths[1];
+      if (!projectNames[projectSlug]) {
         projectService
-          .getProject(projectId)
+          .getProject(projectSlug)
           .then((p) => {
             if (p?.name) {
-              setProjectNames((prev) => ({ ...prev, [projectId]: p.name }));
+              setProjectNames((prev) => ({
+                ...prev,
+                [projectSlug]: p.name,
+                [p.id]: p.name,
+                ...(p.public_id ? { [p.public_id]: p.name } : {}),
+              }));
             }
           })
           .catch(() => {});
@@ -191,8 +196,17 @@ export function TopBar() {
           ) : (
             paths.map((p, idx) => {
               const isLast = idx === paths.length - 1;
-              const isProjectId = paths[0] === 'projects' && idx === 1 && isUuid(p);
-              const displayName = isProjectId && projectNames[p] ? projectNames[p] : p.replace(/-/g, ' ');
+              const isProjectId = paths[0] === 'projects' && idx === 1;
+              let displayName: string;
+              if (isProjectId) {
+                displayName = projectNames[p] || (isUuid(p) ? 'Project' : p);
+              } else if (paths[0] === 'projects' && paths[2] === 'snapshots' && idx === 3) {
+                displayName = isUuid(p) ? `Snapshot ${p.slice(0, 8)}` : p;
+              } else if (paths[0] === 'projects' && paths[2] === 'scans' && idx === 3) {
+                displayName = isUuid(p) ? `Scan ${p.slice(0, 8)}` : p;
+              } else {
+                displayName = p.replace(/-/g, ' ');
+              }
               const targetUrl = '/' + paths.slice(0, idx + 1).join('/');
 
               return (

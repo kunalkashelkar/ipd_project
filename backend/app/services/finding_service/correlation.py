@@ -110,16 +110,18 @@ class FindingCorrelationService:
                 existing_finding.confidence = max(existing_finding.confidence, pred.confidence)
                 existing_finding.risk_score = max(existing_finding.risk_score, risk_score)
                 if existing_finding.status in ("FIXED", "VERIFIED"):
+                    prev_status = existing_finding.status
                     existing_finding.status = "REOPENED"
                     history = FindingStatusHistory(
                         id=uuid.uuid4(),
                         finding_id=existing_finding.id,
-                        previous_status="FIXED",
+                        previous_status=prev_status,
                         new_status="REOPENED",
                         reason="Vulnerability re-detected in subsequent scan",
                         created_at=now,
                     )
                     self.db.add(history)
+
 
                 finding_to_link = existing_finding
             else:

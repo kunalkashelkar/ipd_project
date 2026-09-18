@@ -21,6 +21,7 @@ class ReportResponse(BaseModel):
     """Report record response."""
 
     id: uuid.UUID
+    public_id: str | None = None
     scan_id: uuid.UUID
     format: str
     status: str

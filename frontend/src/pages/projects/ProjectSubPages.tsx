@@ -6,10 +6,15 @@ import { projectService } from '../../services/projectService';
 import { findingService } from '../../services/findingService';
 import { Project, FindingListItem } from '../../types';
 
+import { useLocation } from 'react-router-dom';
+import { getProjectUrl, getScanConfigUrl, getResultsUrl } from '../../utils/routes';
+
 function useCurrentProject(projectId?: string) {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!projectId) return;
@@ -17,12 +22,18 @@ function useCurrentProject(projectId?: string) {
     setError(null);
     projectService
       .getProject(projectId)
-      .then(setProject)
+      .then((data) => {
+        setProject(data);
+        if (data.public_id && projectId === data.id && projectId !== data.public_id) {
+          const canonicalPath = location.pathname.replace(`/projects/${projectId}`, `/projects/${data.public_id}`);
+          navigate(`${canonicalPath}${location.search}${location.hash}`, { replace: true });
+        }
+      })
       .catch((err) => {
         setError(err.response?.data?.message || 'Failed to load project');
       })
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, navigate, location.pathname, location.search, location.hash]);
 
   return { project, loading, error };
 }
@@ -35,6 +46,9 @@ export function ProjectScans() {
   if (loading) return <div className="p-12"><Spinner size="lg" /></div>;
   if (error || !project) return <ErrorState message={error || 'Project not found'} onRetry={() => window.location.reload()} />;
 
+  const projectUrl = getProjectUrl(project);
+  const scanConfigUrl = getScanConfigUrl(project);
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -42,7 +56,7 @@ export function ProjectScans() {
           <Breadcrumbs
             items={[
               { label: 'Projects', to: '/projects' },
-              { label: project.name, to: `/projects/${project.id}` },
+              { label: project.name, to: projectUrl },
               { label: 'Scans' },
             ]}
           />
@@ -50,7 +64,7 @@ export function ProjectScans() {
         title={`${project.name} — Scans`}
         description="Historical and running vulnerability analysis scans for this project."
         action={
-          <Button size="sm" onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
+          <Button size="sm" onClick={() => navigate(scanConfigUrl)}>
             <Plus className="w-4 h-4 mr-1.5" />
             New Scan
           </Button>
@@ -61,7 +75,7 @@ export function ProjectScans() {
         title="No Scans Recorded"
         description="Run your first scan configuration to initialize preprocessing and security analysis."
         action={
-          <Button onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
+          <Button onClick={() => navigate(scanConfigUrl)}>
             Configure Scan
           </Button>
         }
@@ -90,6 +104,9 @@ export function ProjectFindings() {
   if (projectLoading || loadingFindings) return <div className="p-12"><Spinner size="lg" /></div>;
   if (projectError || !project) return <ErrorState message={projectError || 'Project not found'} onRetry={() => window.location.reload()} />;
 
+  const projectUrl = getProjectUrl(project);
+  const scanConfigUrl = getScanConfigUrl(project);
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -97,7 +114,7 @@ export function ProjectFindings() {
           <Breadcrumbs
             items={[
               { label: 'Projects', to: '/projects' },
-              { label: project.name, to: `/projects/${project.id}` },
+              { label: project.name, to: projectUrl },
               { label: 'Findings' },
             ]}
           />
@@ -105,7 +122,7 @@ export function ProjectFindings() {
         title={`${project.name} — Findings`}
         description="Persistent vulnerability findings and security classifications across project scans."
         action={
-          <Button size="sm" onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
+          <Button size="sm" onClick={() => navigate(scanConfigUrl)}>
             <Plus className="w-4 h-4 mr-1.5" />
             New Scan
           </Button>
@@ -118,7 +135,7 @@ export function ProjectFindings() {
           title="No Vulnerabilities Detected Yet"
           description="Findings will appear here once an automated vulnerability scan runs against an immutable snapshot."
           action={
-            <Button onClick={() => navigate(`/projects/${project.id}/scan-config`)}>
+            <Button onClick={() => navigate(scanConfigUrl)}>
               Start Scan
             </Button>
           }
@@ -127,8 +144,14 @@ export function ProjectFindings() {
         <div className="space-y-3">
           {findings.map((f) => {
             const sev = f.severity.toLowerCase();
+            const findingDisplayId = f.public_id || f.id;
+            const findingResultsUrl = getResultsUrl(project, f.latest_scan_public_id || f.latest_scan_id, f.public_id || f.id);
             return (
-              <Card key={f.id} className="p-4 hover:border-primary/50 transition-colors">
+              <Card
+                key={f.id}
+                className="p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => navigate(findingResultsUrl)}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -144,6 +167,9 @@ export function ProjectFindings() {
                         }`}
                       >
                         {f.severity}
+                      </span>
+                      <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                        {findingDisplayId}
                       </span>
                       {f.cwe_id && (
                         <span className="text-xs font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
@@ -188,6 +214,8 @@ export function ProjectReports() {
   if (loading) return <div className="p-12"><Spinner size="lg" /></div>;
   if (error || !project) return <ErrorState message={error || 'Project not found'} onRetry={() => window.location.reload()} />;
 
+  const projectUrl = getProjectUrl(project);
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -195,7 +223,7 @@ export function ProjectReports() {
           <Breadcrumbs
             items={[
               { label: 'Projects', to: '/projects' },
-              { label: project.name, to: `/projects/${project.id}` },
+              { label: project.name, to: projectUrl },
               { label: 'Reports' },
             ]}
           />
@@ -219,6 +247,8 @@ export function ProjectSettings() {
   if (loading) return <div className="p-12"><Spinner size="lg" /></div>;
   if (error || !project) return <ErrorState message={error || 'Project not found'} onRetry={() => window.location.reload()} />;
 
+  const projectUrl = getProjectUrl(project);
+
   return (
     <div className="max-w-4xl space-y-6 pb-12">
       <PageHeader
@@ -226,7 +256,7 @@ export function ProjectSettings() {
           <Breadcrumbs
             items={[
               { label: 'Projects', to: '/projects' },
-              { label: project.name, to: `/projects/${project.id}` },
+              { label: project.name, to: projectUrl },
               { label: 'Settings' },
             ]}
           />

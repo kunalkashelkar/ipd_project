@@ -15,11 +15,12 @@ from typing import Callable
 
 from fastapi import Depends, Header, Path
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.core.exceptions import AuthenticationError, AuthorizationError, NotFoundError
+from backend.app.core.identifiers import is_valid_uuid
 from backend.app.core.security import decode_token
 from backend.app.database.session import get_db
 from backend.app.models.organization import Organization, OrganizationMember
@@ -223,15 +224,22 @@ def require_permission(permission_key: str) -> Callable:
 
 
 async def require_project_access(
-    project_id: uuid.UUID,
+    project_id: str | uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> tuple[Project, OrganizationMember]:
     """Tenant-isolated project resolution:
 
     Resolves project -> organization -> current user active membership.
+    Accepts internal UUID or public identifier (prj_...).
     UUID knowledge of another tenant's project returns 404 to avoid leaking metadata.
     """
+    pid_str = str(project_id).strip()
+    if is_valid_uuid(pid_str):
+        id_cond = or_(Project.id == uuid.UUID(pid_str), Project.public_id == pid_str)
+    else:
+        id_cond = (Project.public_id == pid_str)
+
     stmt = (
         select(Project, OrganizationMember)
         .join(Organization, Project.organization_id == Organization.id)
@@ -246,7 +254,7 @@ async def require_project_access(
             .selectinload(Role.permissions)
             .selectinload(RolePermission.permission)
         )
-        .where(Project.id == project_id)
+        .where(id_cond)
     )
 
     result = await db.execute(stmt)
@@ -314,16 +322,23 @@ async def require_repository_access(
 
 
 async def require_scan_access(
-    scan_id: uuid.UUID,
+    scan_id: str | uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> tuple[Scan, Project, OrganizationMember]:
     """Tenant-isolated scan resolution:
 
     Resolves scan -> project -> organization -> current user active membership.
+    Accepts internal UUID or public identifier (scn_...).
     UUID knowledge of another tenant's scan returns 404 to avoid leaking existence.
     Checks scan.read permission on member role.
     """
+    sid_str = str(scan_id).strip()
+    if is_valid_uuid(sid_str):
+        id_cond = or_(Scan.id == uuid.UUID(sid_str), Scan.public_id == sid_str)
+    else:
+        id_cond = (Scan.public_id == sid_str)
+
     stmt = (
         select(Scan, Project, OrganizationMember)
         .join(Project, Scan.project_id == Project.id)
@@ -339,7 +354,7 @@ async def require_scan_access(
             .selectinload(Role.permissions)
             .selectinload(RolePermission.permission)
         )
-        .where(Scan.id == scan_id)
+        .where(id_cond)
     )
 
     result = await db.execute(stmt)
@@ -361,7 +376,7 @@ async def require_scan_access(
 
 
 async def require_finding_access(
-    finding_id: uuid.UUID,
+    finding_id: str | uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> tuple[Finding, Project, OrganizationMember]:
@@ -371,6 +386,12 @@ async def require_finding_access(
     UUID knowledge of another tenant's finding returns 404 to avoid leaking existence.
     Checks finding.read permission on member role.
     """
+    fid_str = str(finding_id).strip()
+    if is_valid_uuid(fid_str):
+        id_cond = or_(Finding.id == uuid.UUID(fid_str), Finding.public_id == fid_str)
+    else:
+        id_cond = (Finding.public_id == fid_str)
+
     stmt = (
         select(Finding, Project, OrganizationMember)
         .join(Project, Finding.project_id == Project.id)
@@ -386,7 +407,7 @@ async def require_finding_access(
             .selectinload(Role.permissions)
             .selectinload(RolePermission.permission)
         )
-        .where(Finding.id == finding_id)
+        .where(id_cond)
     )
 
     result = await db.execute(stmt)
@@ -405,4 +426,103 @@ async def require_finding_access(
             )
 
     return finding, project, member
+
+
+async def require_remediation_access(
+    remediation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[Any, Project, OrganizationMember]:
+    """Tenant-isolated remediation resolution:
+
+    Resolves remediation -> project -> organization -> current user active membership.
+    UUID knowledge of another tenant's remediation returns 404 to avoid leaking existence.
+    Checks remediation.read permission on member role.
+    """
+    from backend.app.models.remediation import Remediation
+
+    stmt = (
+        select(Remediation, Project, OrganizationMember)
+        .join(Project, Remediation.project_id == Project.id)
+        .join(Organization, Project.organization_id == Organization.id)
+        .join(
+            OrganizationMember,
+            (OrganizationMember.organization_id == Organization.id)
+            & (OrganizationMember.user_id == current_user.id)
+            & (OrganizationMember.status == "active"),
+        )
+        .options(
+            selectinload(OrganizationMember.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission)
+        )
+        .where(Remediation.id == remediation_id)
+    )
+
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if row is None:
+        raise NotFoundError("Remediation not found")
+
+    remediation, project, member = row
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "remediation.read" not in granted:
+            raise AuthorizationError(
+                f"Permission denied: Action requires 'remediation.read' in organization '{member.organization.name if hasattr(member, 'organization') and member.organization else ''}'"
+            )
+
+    return remediation, project, member
+
+
+async def require_validation_access(
+    validation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[Any, Project, OrganizationMember]:
+    """Tenant-isolated validation attempt resolution:
+
+    Resolves validation -> project -> organization -> current user active membership.
+    UUID knowledge of another tenant's validation returns 404 to avoid leaking existence.
+    Checks remediation.read permission on member role.
+    """
+    from backend.app.models.remediation import RemediationValidation
+
+    stmt = (
+        select(RemediationValidation, Project, OrganizationMember)
+        .join(Project, RemediationValidation.project_id == Project.id)
+        .join(Organization, Project.organization_id == Organization.id)
+        .join(
+            OrganizationMember,
+            (OrganizationMember.organization_id == Organization.id)
+            & (OrganizationMember.user_id == current_user.id)
+            & (OrganizationMember.status == "active"),
+        )
+        .options(
+            selectinload(OrganizationMember.role)
+            .selectinload(Role.permissions)
+            .selectinload(RolePermission.permission)
+        )
+        .where(RemediationValidation.id == validation_id)
+    )
+
+    result = await db.execute(stmt)
+    row = result.first()
+
+    if row is None:
+        raise NotFoundError("Validation attempt not found")
+
+    validation, project, member = row
+
+    if member.role.name != "owner":
+        granted = {rp.permission.key for rp in member.role.permissions if rp.permission}
+        if "remediation.read" not in granted:
+            raise AuthorizationError(
+                f"Permission denied: Action requires 'remediation.read' in organization '{member.organization.name if hasattr(member, 'organization') and member.organization else ''}'"
+            )
+
+    return validation, project, member
+
 

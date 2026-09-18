@@ -11,6 +11,7 @@ from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from backend.app.core.identifiers import PREFIX_REPORT, generate_public_id
 from backend.app.database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
@@ -19,6 +20,13 @@ class Report(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "reports"
 
+    public_id: Mapped[str] = mapped_column(
+        String(32),
+        unique=True,
+        index=True,
+        nullable=False,
+        default=lambda: generate_public_id(PREFIX_REPORT),
+    )
     scan_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, index=True
     )

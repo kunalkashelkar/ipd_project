@@ -28,6 +28,22 @@ class ProjectRepository(BaseRepository[Project]):
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_org_and_id_or_public_id(self, org_id: uuid.UUID, identifier: str | uuid.UUID) -> Project | None:
+        """Fetch project by UUID or public identifier ensuring tenant isolation."""
+        from backend.app.core.identifiers import is_valid_uuid
+        id_str = str(identifier).strip()
+        if is_valid_uuid(id_str):
+            cond = or_(Project.id == uuid.UUID(id_str), Project.public_id == id_str)
+        else:
+            cond = (Project.public_id == id_str)
+
+        stmt = select(Project).where(
+            cond,
+            Project.organization_id == org_id,
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def get_org_projects(
         self,
         org_id: uuid.UUID,

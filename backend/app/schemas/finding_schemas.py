@@ -108,7 +108,10 @@ class FindingListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    public_id: str | None = None
     project_id: uuid.UUID
+    project_name: str | None = None
+    project_public_id: str | None = None
     organization_id: uuid.UUID
     title: str
     vulnerability_type: str
@@ -124,6 +127,8 @@ class FindingListItem(BaseModel):
     fixed_at: datetime | None = None
     latest_file_path: str | None = None
     latest_line_number: int | None = None
+    latest_scan_id: uuid.UUID | None = None
+    latest_scan_public_id: str | None = None
     occurrence_count: int = 1
 
 
@@ -131,7 +136,10 @@ class FindingDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    public_id: str | None = None
     project_id: uuid.UUID
+    project_public_id: str | None = None
+    project_name: str | None = None
     organization_id: uuid.UUID
     title: str
     vulnerability_type: str
@@ -170,6 +178,15 @@ class ProjectFindingsSummary(BaseModel):
     suppressed: int = 0
     false_positive: int = 0
     risk_accepted: int = 0
+
+
+class GlobalFindingsSummary(BaseModel):
+    total: int = 0
+    critical: int = 0
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    info: int = 0
 
 
 class FindingStatusTransitionRequest(BaseModel):

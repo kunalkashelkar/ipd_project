@@ -85,7 +85,14 @@ export interface FindingSuppression {
 
 export interface FindingListItem {
   id: string;
+  public_id?: string;
   project_id: string;
+  project_public_id?: string;
+  project_name?: string;
+  latest_scan_id?: string;
+  latest_scan_public_id?: string;
+  scan_public_id?: string;
+  latest_scan_status?: string;
   organization_id: string;
   title: string;
   vulnerability_type: string;
@@ -106,7 +113,10 @@ export interface FindingListItem {
 
 export interface FindingDetail {
   id: string;
+  public_id?: string;
   project_id: string;
+  project_public_id?: string;
+  project_name?: string;
   organization_id: string;
   title: string;
   vulnerability_type: string;
@@ -145,6 +155,17 @@ export interface ProjectFindingsSummary {
   suppressed: number;
   false_positive: number;
   risk_accepted: number;
+}
+
+export interface GlobalFindingsSummary {
+  total: number;
+  open: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  fixed: number;
+  suppressed: number;
 }
 
 export interface FindingSourceContext {

@@ -12,6 +12,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstr
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from backend.app.core.identifiers import PREFIX_PROJECT, generate_public_id
 from backend.app.database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
@@ -31,6 +32,13 @@ class Project(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         UniqueConstraint("organization_id", "name", name="uq_project_org_name"),
     )
 
+    public_id: Mapped[str] = mapped_column(
+        String(32),
+        unique=True,
+        index=True,
+        nullable=False,
+        default=lambda: generate_public_id(PREFIX_PROJECT),
+    )
     organization_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=False, index=True
     )

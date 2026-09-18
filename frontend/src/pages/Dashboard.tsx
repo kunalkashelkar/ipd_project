@@ -7,6 +7,7 @@ import { useAuthStore } from '../store';
 import { analyticsService } from '../services/analyticsService';
 import { projectService } from '../services/projectService';
 import { Project, DashboardMetrics } from '../types';
+import { getProjectUrl } from '../utils/routes';
 
 export default function Dashboard() {
   const { activeOrganization } = useAuthStore();
@@ -173,7 +174,7 @@ export default function Dashboard() {
                           {new Date(project.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-5 py-3 text-right">
-                          <Link to={`/projects/${project.id}`}>
+                          <Link to={getProjectUrl(project)}>
                             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
                               Open <ArrowRight className="w-3 h-3" />
                             </Button>

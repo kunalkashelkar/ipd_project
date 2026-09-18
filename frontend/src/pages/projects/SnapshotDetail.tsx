@@ -3,7 +3,7 @@
 // ============================================================
 
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   FileCode2,
   GitCommit,
@@ -27,12 +27,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { snapshotService } from '../../services/snapshotService';
-import { SourceSnapshot, SourceFile, SourceFileContent, FunctionModel } from '../../types';
+import { projectService } from '../../services/projectService';
+import { SourceSnapshot, SourceFile, SourceFileContent, FunctionModel, Project } from '../../types';
+import { getProjectUrl, getScanConfigUrl, toProjectSlug } from '../../utils/routes';
 import toast from 'react-hot-toast';
 
 export default function SnapshotDetail() {
+  const navigate = useNavigate();
   const { projectId, snapshotId } = useParams<{ projectId: string; snapshotId: string }>();
 
+  const [project, setProject] = useState<Project | null>(null);
   const [snapshot, setSnapshot] = useState<SourceSnapshot | null>(null);
   const [files, setFiles] = useState<SourceFile[]>([]);
   const [totalFiles, setTotalFiles] = useState<number>(0);
@@ -52,6 +56,22 @@ export default function SnapshotDetail() {
   const [fileContent, setFileContent] = useState<SourceFileContent | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
   const [copiedHash, setCopiedHash] = useState(false);
+
+  useEffect(() => {
+    if (projectId) {
+      projectService.getProject(projectId).then(setProject).catch(() => {});
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (snapshot && projectId && snapshotId) {
+      const canonicalProj = toProjectSlug(project || projectId);
+      const canonicalSnap = snapshot.public_id || snapshot.id;
+      if (canonicalProj && (projectId !== canonicalProj || snapshotId !== canonicalSnap)) {
+        navigate(`/projects/${canonicalProj}/snapshots/${canonicalSnap}`, { replace: true });
+      }
+    }
+  }, [project, snapshot, projectId, snapshotId, navigate]);
 
   useEffect(() => {
     if (!projectId || !snapshotId) return;
@@ -149,7 +169,7 @@ export default function SnapshotDetail() {
     return (
       <div className="text-center py-20 text-muted-foreground">
         <p className="text-sm font-medium text-foreground">Source Snapshot not found.</p>
-        <Link to={`/projects/${projectId}`}>
+        <Link to={getProjectUrl(project || projectId)}>
           <Button variant="outline" size="sm" className="mt-4 text-xs">
             Back to Project
           </Button>
@@ -164,11 +184,11 @@ export default function SnapshotDetail() {
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-4 border-b border-border/50">
         <div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
-            <Link to={`/projects/${projectId}`} className="hover:text-foreground flex items-center gap-1">
+            <Link to={getProjectUrl(project || projectId)} className="hover:text-foreground flex items-center gap-1">
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Project
             </Link>
             <span>/</span>
-            <span className="font-mono">Snapshot {snapshot.id.slice(0, 8)}</span>
+            <span className="font-mono">{snapshot.public_id || snapshot.id}</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -218,7 +238,7 @@ export default function SnapshotDetail() {
 
         <div className="flex items-center gap-2 shrink-0">
           {snapshot.status === 'ready' && (
-            <Link to={`/projects/${projectId}/scan-config`}>
+            <Link to={getScanConfigUrl(project || projectId)}>
               <Button size="sm" className="text-xs gap-1.5">
                 <Play className="w-3.5 h-3.5" />
                 Scan this Snapshot

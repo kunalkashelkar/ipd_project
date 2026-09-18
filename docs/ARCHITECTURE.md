@@ -283,9 +283,79 @@ Phase 5 implements the permanent AI provider contract and finding correlation en
 
 ---
 
-## 10. Explicitly Deferred Phase 6–8 Features
+### 9.6 Phase 6 Architecture — Explainability (XAI), LLM Remediation, Isolated Validation Sandbox, & Authoritative Verification Pipeline
 
-The following features belong strictly to future phases and are intentionally NOT implemented in Phase 5:
-- **Phase 6**: XAI explanations (Captum, Integrated Gradients, SHAP, GNNExplainer), LLM remediation generation, automated patch generation, patch application, patch verification.
-- **Phase 7**: Automated PDF/HTML report exports, external CI/CD & PR scan integrations, Slack/email notifications.
+Phase 6 implements the complete, production-grade vulnerability explainability, AI remediation, disposable sandbox validation, and authoritative verification lifecycle:
+
+```
+Finding
+    ↓
+Why Vulnerable? (Evidence-Aware Context Synthesizer)
+    ↓
+XAI Attribution (Normalized across Integrated Gradients, SHAP, GNNExplainer, Transformer Attention)
+    ↓
+RemediationProvider (Unified Diff Patch with SHA-256 Checksum)
+    ↓
+Human Review (Backend-Authoritative: APPROVE / REJECT)
+    ↓
+Patch Apply in Disposable Validation Workspace (/tmp/validation_workspaces/<val_id>)
+    ↓
+Multi-Stage Validation Pipeline:
+    ├── Patch Apply (Path Traversal & Checksum Verification)
+    ├── Syntax Validation (compileall / node --check)
+    ├── Build & Test Validation (Allowlisted Commands, Zero Injected Secrets)
+    ├── Static Re-Analysis (Phase 4 Pipeline Re-execution)
+    ├── Taint & Graph Re-Analysis (Path Traversal / Reachability Recheck)
+    └── Security Regression Check (Ensures No New Critical/High Issues Introduced)
+    ↓
+Authoritative Verification Scan (SYSTEM_RESCAN, purpose=REMEDIATION_VERIFICATION)
+    ↓
+Lifecycle State Transition:
+    ├── If Validated + Absent Fingerprint: FIXED → VERIFIED
+    └── If Validation Fails: FAILED_VALIDATION (Finding remains Unresolved)
+```
+
+1. **Non-Negotiable Core Invariant: `AI-generated fix != verified fix`**:
+   - An AI model or LLM cannot mark a finding `VERIFIED` or `FIXED`.
+   - Patches are proposed unified diffs stored with SHA-256 provenance in MinIO/S3.
+   - Only the central `FindingLifecycleService` can transition findings to `FIXED` and `VERIFIED` after the multi-stage validation pipeline and verification scan prove resolution with persisted evidence.
+
+2. **Model Registry & Real Model Provider Boundary**:
+   - `ModelRegistryService` tracks registered model versions (`model_versions` table) with cryptographic checksums, runtimes, schema versions, and activation states.
+   - `LocalTorchProvider` implements the real PyTorch / TorchScript / GNN boundary. When model checkpoints are missing or unconfigured, it returns structured, honest `MODEL_NOT_READY` / `PROVIDER_UNAVAILABLE` states without ever fabricating fake inference or silent mock fallbacks.
+
+3. **Normalized XAI & Attribution Schema**:
+   - `XAIExplanationService` unifies attributions from Captum Integrated Gradients, SHAP, GNNExplainer, and Transformer attention into a canonical schema.
+   - Attributions provide exact source line mappings (`start_line`-`end_line` with importance scores), attributed tokens, and attributed graph nodes.
+   - If an XAI method lacks compatible model weights or graph inputs, it records structured `MODEL_NOT_READY` or `NOT_SUPPORTED` statuses. Fake attribution scores are strictly prohibited.
+   - Large raw explanation artifacts (tensors, subgraphs, attention matrices) are stored in object storage under `xai_artifacts/`.
+
+4. **Remediation Domain & Safety**:
+   - `remediations` table stores sequential proposals per finding (`remediation_number`: 1, 2, 3...) preserving historical attempts.
+   - `PatchService` validates patch security: strictly rejects directory traversal (`..`), absolute paths, and paths outside the workspace boundary.
+   - Base source snapshots remain strictly immutable. Patches are applied strictly inside temporary validation sandboxes.
+
+5. **Isolated Validation Sandbox & Multi-Stage Pipeline**:
+   - `ValidationService` prepares a disposable sandbox (`/tmp/validation_workspaces/<validation_id>`).
+   - Sandbox constraints: restricted environment variables (no DB credentials, no API keys, no cloud secrets), isolated directory structure, timeout controls, and allowlisted execution commands.
+   - Multi-stage pipeline:
+     1. Patch application
+     2. Language-aware syntax checking
+     3. Allowlisted test execution
+     4. Static re-analysis
+     5. Taint & graph re-analysis
+     6. Security regression check
+   - Persists structured validation runs into `remediation_validations` with step-by-step pass/fail results and logs.
+
+6. **Regression & Reopen Behavior**:
+   - If a finding marked `VERIFIED` is subsequently re-detected in a later scan, the finding transitions to `REOPENED` with a new `FindingOccurrence`.
+   - Historical `VERIFIED` status is preserved in `finding_status_history`.
+
+---
+
+## 10. Explicitly Deferred Phase 7–8 Features
+
+The following features belong strictly to future phases and are intentionally NOT implemented in Phase 6:
+- **Phase 7**: Automated PDF/HTML report exports, time-series historical analytics, external CI/CD & PR scan integrations, Slack/email notifications.
 - **Phase 8**: Production hardening, HA scaling, distributed Kafka/Kubernetes clusters, SSO.
+

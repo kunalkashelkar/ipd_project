@@ -90,7 +90,7 @@ async def list_projects(
 
 @router.get("/{project_id}", summary="Get a project by ID")
 async def get_project(
-    project_id: uuid.UUID,
+    project_id: str,
     project_context: tuple[Project, OrganizationMember] = Depends(require_project_access),
 ):
     """Retrieve project details ensuring tenant isolation."""
@@ -103,7 +103,7 @@ async def get_project(
 
 @router.patch("/{project_id}", summary="Update a project")
 async def update_project(
-    project_id: uuid.UUID,
+    project_id: str,
     body: ProjectUpdate,
     request: Request,
     project_context: tuple[Project, OrganizationMember] = Depends(require_project_access),
@@ -138,7 +138,7 @@ async def update_project(
 
 @router.delete("/{project_id}", summary="Delete (archive) a project")
 async def delete_project(
-    project_id: uuid.UUID,
+    project_id: str,
     request: Request,
     project_context: tuple[Project, OrganizationMember] = Depends(require_project_access),
     current_user: User = Depends(get_current_user),
@@ -163,7 +163,7 @@ async def delete_project(
 
 @router.post("/{project_id}/archive", summary="Archive a project")
 async def archive_project(
-    project_id: uuid.UUID,
+    project_id: str,
     request: Request,
     project_context: tuple[Project, OrganizationMember] = Depends(require_project_access),
     current_user: User = Depends(get_current_user),

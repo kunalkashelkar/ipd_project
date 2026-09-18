@@ -12,6 +12,7 @@ from backend.app.services.ai_inference.contracts import (
     SourceFileContext,
 )
 from backend.app.services.ai_inference.factory import get_ai_provider
+from backend.app.services.ai_inference.local_torch_provider import LocalTorchProvider
 
 __all__ = [
     "AIInferenceProvider",
@@ -22,4 +23,5 @@ __all__ = [
     "AIErrorCode",
     "AIInferenceError",
     "get_ai_provider",
+    "LocalTorchProvider",
 ]

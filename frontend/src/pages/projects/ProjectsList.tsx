@@ -6,6 +6,7 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { Link, useNavigate } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
 import { Project } from '../../types';
+import { getProjectUrl } from '../../utils/routes';
 
 export default function ProjectsList() {
   const navigate = useNavigate();
@@ -29,57 +30,66 @@ export default function ProjectsList() {
         setLoading(false);
       }
     }
-    const debounce = setTimeout(load, 300);
-    return () => clearTimeout(debounce);
+    load();
   }, [search]);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Projects</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Manage source code repositories, direct uploads, and scan configurations.
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Projects</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Manage your source code repositories, snapshots, and security scan lifecycles.
           </p>
         </div>
         <Link to="/projects/create">
-          <Button size="sm" className="gap-1.5 text-xs">
-            <Plus className="w-3.5 h-3.5" />
-            New Project
+          <Button size="sm" className="gap-1.5 shadow-sm">
+            <Plus className="w-4 h-4" /> New Project
           </Button>
         </Link>
       </div>
 
-      {/* Search Filter */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search projects by name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 h-9 bg-card border border-border rounded-md text-xs text-foreground focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground/60 transition-colors"
-        />
-      </div>
+      {/* Main Container Card */}
+      <Card className="border border-border/60 shadow-sm overflow-hidden">
+        {/* Search Bar Strip */}
+        <div className="p-4 border-b border-border bg-card/40 flex items-center justify-between gap-4">
+          <div className="relative w-full max-w-md">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search projects by name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-muted/40 border border-border rounded-md pl-9 pr-4 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground font-mono">
+            {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
+          </span>
+        </div>
 
-      {/* Projects Table */}
-      <Card>
+        {/* Content Section */}
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <div className="flex flex-col items-center justify-center py-24 space-y-3">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <span className="text-xs text-muted-foreground">Loading workspace projects...</span>
             </div>
           ) : projects.length === 0 ? (
-            <div className="text-center py-16 px-4 text-muted-foreground">
-              <FolderGit2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-medium text-foreground">No projects found</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                {search ? 'No projects match your search query.' : 'Create your first project to configure security scans.'}
+            <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+              <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
+                <FolderGit2 className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground">No projects found</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
+                {search
+                  ? 'No projects matched your search criteria. Try a different query.'
+                  : 'Get started by creating your first project to upload code and run vulnerability scans.'}
               </p>
               {!search && (
                 <Link to="/projects/create">
-                  <Button variant="outline" size="sm" className="mt-4 gap-1.5 text-xs">
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs">
                     <Plus className="w-3.5 h-3.5" /> Create Project
                   </Button>
                 </Link>
@@ -102,7 +112,7 @@ export default function ProjectsList() {
                   {projects.map((project) => (
                     <tr
                       key={project.id}
-                      onClick={() => navigate(`/projects/${project.id}`)}
+                      onClick={() => navigate(getProjectUrl(project))}
                       className="hover:bg-hover transition-colors cursor-pointer group"
                     >
                       <td className="px-5 py-3 font-medium text-foreground">
@@ -142,7 +152,7 @@ export default function ProjectsList() {
                           className="h-7 text-xs gap-1 group-hover:bg-primary/10 group-hover:text-primary"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/projects/${project.id}`);
+                            navigate(getProjectUrl(project));
                           }}
                         >
                           View <ArrowRight className="w-3 h-3" />

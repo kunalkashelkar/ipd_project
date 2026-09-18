@@ -30,14 +30,14 @@ router = APIRouter(tags=["Repositories"])
 
 
 async def _resolve_authorized_project(
-    project_id: uuid.UUID,
+    project_id: str | uuid.UUID,
     db: AsyncSession,
     current_user: User,
     active_org_id: uuid.UUID,
 ) -> Project:
     """Ensure project belongs strictly to active organization."""
     project_repo = ProjectRepository(db)
-    project = await project_repo.get_by_id(project_id)
+    project = await project_repo.get_by_org_and_id_or_public_id(active_org_id, project_id)
     if not project or project.organization_id != active_org_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -51,7 +51,7 @@ async def _resolve_authorized_project(
     status_code=status.HTTP_201_CREATED,
 )
 async def connect_repository(
-    project_id: uuid.UUID,
+    project_id: str,
     req: RepositoryConnectRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -151,15 +151,15 @@ async def connect_repository(
     "/projects/{project_id}/repositories",
 )
 async def list_repositories(
-    project_id: uuid.UUID,
+    project_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """List connected repositories for a project."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo_vcs_repo = RepositoryVcsRepository(db)
-    items = await repo_vcs_repo.list_for_project(project_id)
+    items = await repo_vcs_repo.list_for_project(project.id)
     return success_response(
         data=[RepositoryResponse.model_validate(r).model_dump(mode="json") for r in items]
     )
@@ -169,17 +169,17 @@ async def list_repositories(
     "/projects/{project_id}/repositories/{repo_id}",
 )
 async def get_repository_detail(
-    project_id: uuid.UUID,
+    project_id: str,
     repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """Get connected repository details."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo_vcs_repo = RepositoryVcsRepository(db)
     repo = await repo_vcs_repo.get_by_id(repo_id)
-    if not repo or repo.project_id != project_id:
+    if not repo or repo.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
     return success_response(
         data=RepositoryResponse.model_validate(repo).model_dump(mode="json")
@@ -303,7 +303,7 @@ async def list_repository_commits(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def trigger_repository_sync(
-    project_id: uuid.UUID,
+    project_id: str,
     repo_id: uuid.UUID,
     branch: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -311,10 +311,10 @@ async def trigger_repository_sync(
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """Trigger background repository synchronization, creating a new immutable snapshot."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo_vcs_repo = RepositoryVcsRepository(db)
     repo = await repo_vcs_repo.get_by_id(repo_id)
-    if not repo or repo.project_id != project_id:
+    if not repo or repo.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
 
     target_branch = branch or repo.branch or "main"
@@ -331,17 +331,17 @@ async def trigger_repository_sync(
     "/projects/{project_id}/repositories/{repo_id}/disconnect",
 )
 async def disconnect_repository(
-    project_id: uuid.UUID,
+    project_id: str,
     repo_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """Disconnect repository connection while preserving all historical snapshots for audit and scan provenance."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo_vcs_repo = RepositoryVcsRepository(db)
     repo = await repo_vcs_repo.get_by_id(repo_id)
-    if not repo or repo.project_id != project_id:
+    if not repo or repo.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
 
     updated = await repo_vcs_repo.disconnect(repo_id)

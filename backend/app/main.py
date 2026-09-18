@@ -31,9 +31,11 @@ from backend.app.routers import (
     finding_router,
     health_router,
     invitation_router,
+    model_router,
     notification_router,
     organization_router,
     project_router,
+    remediation_router,
     report_router,
     repository_router,
     result_router,
@@ -42,7 +44,9 @@ from backend.app.routers import (
     team_router,
     upload_router,
     websocket_router,
+    xai_router,
 )
+
 
 
 settings = get_settings()
@@ -119,10 +123,16 @@ app.include_router(finding_router, prefix=API_PREFIX)
 app.include_router(result_router, prefix=API_PREFIX)
 app.include_router(report_router, prefix=API_PREFIX)
 
-# Batch 5: Notifications, Analytics & WebSockets
+# Batch 5: Phase 6 XAI, Remediation & Model Registry
+app.include_router(xai_router, prefix=API_PREFIX)
+app.include_router(remediation_router, prefix=API_PREFIX)
+app.include_router(model_router, prefix=API_PREFIX)
+
+# Batch 6: Notifications, Analytics & WebSockets
 app.include_router(websocket_router)
 app.include_router(notification_router, prefix=API_PREFIX)
 app.include_router(analytics_router, prefix=API_PREFIX)
+
 
 
 

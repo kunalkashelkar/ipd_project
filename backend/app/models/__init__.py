@@ -34,8 +34,12 @@ from backend.app.models.finding import (
 from backend.app.models.upload import Upload
 from backend.app.models.user import User
 from backend.app.models.vulnerability import Vulnerability
+from backend.app.models.model_registry import ModelVersion
+from backend.app.models.explanation import AIExplanation
+from backend.app.models.remediation import Remediation, RemediationValidation
 
 __all__ = [
+    "AIExplanation",
     "AIPrediction",
     "AnalysisArtifact",
     "ApiKey",
@@ -48,12 +52,15 @@ __all__ = [
     "FindingStatusHistory",
     "FindingSuppression",
     "Function",
+    "ModelVersion",
     "Notification",
     "Organization",
     "OrganizationInvitation",
     "OrganizationMember",
     "Permission",
     "Project",
+    "Remediation",
+    "RemediationValidation",
     "Report",
     "Repository",
     "RepositoryBranch",

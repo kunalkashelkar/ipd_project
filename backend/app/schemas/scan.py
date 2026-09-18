@@ -25,9 +25,14 @@ class ScanResponse(BaseModel):
     """Scan record response."""
 
     id: uuid.UUID
+    public_id: str | None = None
     project_id: uuid.UUID
+    project_name: str | None = None
+    project_public_id: str | None = None
     organization_id: uuid.UUID | None = None
     source_snapshot_id: uuid.UUID | None = None
+    source_snapshot_version: str | None = None
+    source_snapshot_public_id: str | None = None
     upload_id: uuid.UUID | None = None
     repository_id: uuid.UUID | None = None
     created_by: uuid.UUID | None = None
@@ -47,6 +52,8 @@ class ScanResponse(BaseModel):
     error_message: str | None = None
     config: dict | None = None
     ai_model_version: str | None = None
+    purpose: str | None = "GENERAL_SCAN"
+    finding_count: int = 0
     created_at: datetime
     updated_at: datetime
 

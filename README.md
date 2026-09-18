@@ -310,12 +310,69 @@ cd frontend && npm run dev
         └──────────────────────────────────┘  └──────────────────────────────────┘
 ```
 
-### Immutable Source Snapshot Invariants
-1. **Provenance Boundary**: Every vulnerability scan strictly references a permanent, immutable `source_snapshot_id`.
-2. **Ready Status Gate**: Scans can only be triggered on snapshots in `ready` status (`pending`, `processing`, or `failed` snapshots are rejected at API and DB layers).
-3. **No Code Execution**: FastAPI and workers treat source code strictly as data; build scripts, hooks, package managers, and setup scripts are never executed.
-4. **Isolated Containment**: Raw, normalized, and tokenized artifacts reside exclusively in object storage (MinIO/S3), keeping PostgreSQL free of source blobs.
-5. **Deterministic Identities**: Extracted functions receive reproducible semantic identifiers (`sha256(snapshot_id:path:name:signature:start_line)[:32]`).
+---
+
+## Phase 4–6 Architecture: Complete Detection, Correlation, XAI & Remediation Pipeline
+
+```
+SourceSnapshot (Immutable)
+    ↓
+Static Analysis Pipeline (AST / CFG / PDG / CPG / CallGraph)
+    ↓
+Taint Analysis Engine (Source → Sink Data-flow Tracking)
+    ↓
+AI Inference Provider (LocalTorchProvider / Boundary Factory)
+    ↓
+Canonical AIPrediction (Fingerprinted & Scored)
+    ↓
+Correlation Engine (Cross-scan Deduplication & Occurrence Tracking)
+    ↓
+Finding (Persistent Domain Model)
+    ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Explainability & XAI Engine                                 │
+│ - Evidence-Aware Context Synthesis                         │
+│ - Normalized Attribution (Captum IG, SHAP, GNNExplainer, Attn)│
+│ - Important Source Lines, Attributed Tokens, Graph Nodes    │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Remediation Engine                                          │
+│ - Proposed Unified Diff Patch with SHA-256 Checksum        │
+│ - Path Sanitization (Rejects .. & absolute paths)           │
+│ - Human Review (APPROVE / REJECT)                           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Disposable Validation Sandbox (/tmp/validation_workspaces/)  │
+│ 1. Patch Apply (Verified Checksum & Base Snapshot)          │
+│ 2. Syntax Validation (compileall / node --check)            │
+│ 3. Build & Test Execution (Allowlisted, Zero Secrets)        │
+│ 4. Static Re-Analysis (Re-evaluates Original Finding)       │
+│ 5. Taint & Graph Re-Analysis                                │
+│ 6. Security Regression Check (Detects Introduced Flaws)      │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Authoritative Verification Scan                             │
+│ - Trigger: SYSTEM_RESCAN (purpose=REMEDIATION_VERIFICATION) │
+│ - Verifies original vulnerability fingerprint is absent     │
+│ - Transitions finding: FIXED → VERIFIED                     │
+│ - Invariant: AI-generated fix != verified fix               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Core Security & Architectural Invariants
+
+1. **AI-Generated Fix != Verified Fix**: An AI model, LLM, or patch generator can never set a finding's status to `FIXED` or `VERIFIED`. Only the authoritative `FindingLifecycleService` can execute this transition after the multi-stage validation sandbox and verification scan prove resolution with persisted evidence.
+2. **Disposable Validation Sandboxing**: Untrusted patch execution occurs inside disposable validation workspaces (`/tmp/validation_workspaces/<validation_id>`). Environment variables containing database passwords, API keys, and cloud credentials are intentionally stripped.
+3. **Strict Path Sanitization**: Proposed patches are scanned prior to application; patches containing directory traversal (`..`), absolute paths, or references outside the sandbox are rejected with `PatchSecurityError`.
+4. **Source Snapshot Immutability**: Base source code snapshots are read-only and cryptographically hashed. Applying a patch never modifies the base snapshot.
+5. **Deduplication & Regression Reopening**: Findings persist across scans via stable SHA-256 fingerprints. If a vulnerability previously marked `VERIFIED` is re-detected in a subsequent scan, it automatically transitions to `REOPENED` with a new `FindingOccurrence` while preserving historical `VERIFIED` audit records.
+6. **Zero Fake Results**: If PyTorch model checkpoints, GPU devices, or GNN weights are unconfigured, providers return structured `MODEL_NOT_READY` or `NOT_SUPPORTED` error boundaries. The system never fabricates attribution scores or synthetic passes.
 
 ---
 
@@ -327,10 +384,11 @@ cd frontend && npm run dev
 | 1 | Infrastructure, Auth Baseline, Security Hardening | ✅ Complete |
 | 2 | Multi-Tenancy, Organizations, Custom RBAC & Audit | ✅ Complete |
 | 3 | Project, Repository, Source Ingestion & Preprocessing | ✅ Complete |
-| 4 | Code Property Graph (CPG) Construction & Joern Pipeline | ⬜ Next Phase |
-| 5 | AI Detection Models (Graph Neural Networks & CodeBERT) | ⬜ Pending |
-| 6 | Explainable AI (XAI) & Autonomous Remediation | ⬜ Pending |
-| 7 | Security Reports, Export Engine & Integrations | ⬜ Pending |
+| 4 | Code Property Graph (CPG) Construction, Static Analysis & Taint Pipeline | ✅ Complete |
+| 5 | AI Provider Boundary, Finding Deduplication, Correlation & Results Workspace | ✅ Complete |
+| 6 | Explainable AI (XAI), LLM Remediation, Sandbox Validation & Verification Scan | ✅ Complete |
+| 7 | Security Reports, Export Engine (PDF/HTML) & CI/CD Integrations | ⬜ Deferred |
+| 8 | Production Hardening, Distributed HA Clusters & Enterprise SSO | ⬜ Deferred |
 
 ---
 
@@ -341,3 +399,4 @@ MIT
 ---
 
 *Built as part of the Hybrid XAI Vulnerability Detection research project.*
+

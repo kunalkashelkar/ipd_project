@@ -71,6 +71,42 @@ class StorageService:
         clean_type = artifact_type.lower()
         return f"organizations/{org_id}/projects/{project_id}/scans/{scan_id}/artifacts/{clean_type}/{artifact_id}{clean_ext}"
 
+    @staticmethod
+    def xai_artifact_key(
+        org_id: uuid.UUID,
+        project_id: uuid.UUID,
+        finding_id: uuid.UUID,
+        explanation_id: uuid.UUID,
+        ext: str = ".json",
+    ) -> str:
+        """organizations/{org_id}/projects/{project_id}/findings/{finding_id}/xai/{explanation_id}{ext}"""
+        clean_ext = ext if ext.startswith(".") else f".{ext}"
+        return f"organizations/{org_id}/projects/{project_id}/findings/{finding_id}/xai/{explanation_id}{clean_ext}"
+
+    @staticmethod
+    def remediation_patch_key(
+        org_id: uuid.UUID,
+        project_id: uuid.UUID,
+        finding_id: uuid.UUID,
+        remediation_id: uuid.UUID,
+        ext: str = ".diff",
+    ) -> str:
+        """organizations/{org_id}/projects/{project_id}/findings/{finding_id}/remediations/{remediation_id}/patch{ext}"""
+        clean_ext = ext if ext.startswith(".") else f".{ext}"
+        return f"organizations/{org_id}/projects/{project_id}/findings/{finding_id}/remediations/{remediation_id}/patch{clean_ext}"
+
+    @staticmethod
+    def validation_logs_key(
+        org_id: uuid.UUID,
+        project_id: uuid.UUID,
+        remediation_id: uuid.UUID,
+        validation_id: uuid.UUID,
+        ext: str = ".txt",
+    ) -> str:
+        """organizations/{org_id}/projects/{project_id}/remediations/{remediation_id}/validations/{validation_id}/logs{ext}"""
+        clean_ext = ext if ext.startswith(".") else f".{ext}"
+        return f"organizations/{org_id}/projects/{project_id}/remediations/{remediation_id}/validations/{validation_id}/logs{clean_ext}"
+
     # ── Storage Operations ──────────────────────────────────
 
     async def save_upload(

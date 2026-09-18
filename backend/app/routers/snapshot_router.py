@@ -36,15 +36,15 @@ router = APIRouter(tags=["Snapshots & Sources"])
 
 
 async def _resolve_authorized_project(
-    project_id: uuid.UUID,
+    project_id: str | uuid.UUID,
     db: AsyncSession,
     current_user: User,
     active_org_id: uuid.UUID,
 ) -> Project:
     """Ensure project belongs strictly to active organization."""
     project_repo = ProjectRepository(db)
-    project = await project_repo.get_by_id(project_id)
-    if not project or project.organization_id != active_org_id:
+    project = await project_repo.get_by_org_and_id_or_public_id(active_org_id, project_id)
+    if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found in active organization",
@@ -61,7 +61,7 @@ async def _resolve_authorized_project(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_source_archive(
-    project_id: uuid.UUID,
+    project_id: str,
     file: UploadFile,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -131,7 +131,7 @@ async def upload_source_archive(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_source_files(
-    project_id: uuid.UUID,
+    project_id: str,
     files: List[UploadFile],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -198,7 +198,7 @@ async def upload_source_files(
     "/projects/{project_id}/snapshots",
 )
 async def list_project_snapshots(
-    project_id: uuid.UUID,
+    project_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -206,9 +206,9 @@ async def list_project_snapshots(
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """List immutable source snapshots for a project."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo = SnapshotRepository(db)
-    items, total = await repo.list_for_project(project_id, page=page, page_size=page_size)
+    items, total = await repo.list_for_project(project.id, page=page, page_size=page_size)
     return paginated_response(
         items=[SourceSnapshotResponse.model_validate(i).model_dump(mode="json") for i in items],
         total=total,
@@ -221,17 +221,17 @@ async def list_project_snapshots(
     "/projects/{project_id}/snapshots/{snapshot_id}",
 )
 async def get_snapshot_detail(
-    project_id: uuid.UUID,
-    snapshot_id: uuid.UUID,
+    project_id: str,
+    snapshot_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """Get metadata for a specific snapshot."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo = SnapshotRepository(db)
-    snapshot = await repo.get_by_id(snapshot_id)
-    if not snapshot or snapshot.project_id != project_id:
+    snapshot = await repo.get_by_id_or_public_id(snapshot_id)
+    if not snapshot or snapshot.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Snapshot not found")
     return success_response(
         data=SourceSnapshotResponse.model_validate(snapshot).model_dump(mode="json")
@@ -242,8 +242,8 @@ async def get_snapshot_detail(
     "/projects/{project_id}/snapshots/{snapshot_id}/files",
 )
 async def list_snapshot_files(
-    project_id: uuid.UUID,
-    snapshot_id: uuid.UUID,
+    project_id: str,
+    snapshot_id: str,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
     search: str | None = Query(None),
@@ -253,14 +253,14 @@ async def list_snapshot_files(
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """List source files in an immutable snapshot."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo = SnapshotRepository(db)
-    snapshot = await repo.get_by_id(snapshot_id)
-    if not snapshot or snapshot.project_id != project_id:
+    snapshot = await repo.get_by_id_or_public_id(snapshot_id)
+    if not snapshot or snapshot.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Snapshot not found")
 
     items, total = await repo.list_files_for_snapshot(
-        snapshot_id=snapshot_id,
+        snapshot_id=snapshot.id,
         page=page,
         page_size=page_size,
         search=search,
@@ -278,22 +278,22 @@ async def list_snapshot_files(
     "/projects/{project_id}/snapshots/{snapshot_id}/files/{file_id}/content",
 )
 async def get_source_file_content(
-    project_id: uuid.UUID,
-    snapshot_id: uuid.UUID,
+    project_id: str,
+    snapshot_id: str,
     file_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """Safely retrieve source file content from object storage for in-browser inspection."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo = SnapshotRepository(db)
-    snapshot = await repo.get_by_id(snapshot_id)
-    if not snapshot or snapshot.project_id != project_id:
+    snapshot = await repo.get_by_id_or_public_id(snapshot_id)
+    if not snapshot or snapshot.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Snapshot not found")
 
     sf = await repo.get_file_by_id(file_id)
-    if not sf or sf.source_snapshot_id != snapshot_id:
+    if not sf or sf.source_snapshot_id != snapshot.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source file not found")
 
     if sf.is_binary:
@@ -333,21 +333,21 @@ async def get_source_file_content(
     "/projects/{project_id}/snapshots/{snapshot_id}/functions",
 )
 async def list_snapshot_functions(
-    project_id: uuid.UUID,
-    snapshot_id: uuid.UUID,
+    project_id: str,
+    snapshot_id: str,
     file_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
 ):
     """List extracted functions for a snapshot."""
-    await _resolve_authorized_project(project_id, db, current_user, active_org_id)
+    project = await _resolve_authorized_project(project_id, db, current_user, active_org_id)
     repo = SnapshotRepository(db)
-    snapshot = await repo.get_by_id(snapshot_id)
-    if not snapshot or snapshot.project_id != project_id:
+    snapshot = await repo.get_by_id_or_public_id(snapshot_id)
+    if not snapshot or snapshot.project_id != project.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Snapshot not found")
 
-    funcs = await repo.list_functions_for_snapshot(snapshot_id=snapshot_id, file_id=file_id)
+    funcs = await repo.list_functions_for_snapshot(snapshot_id=snapshot.id, file_id=file_id)
     return paginated_response(
         items=[FunctionResponse.model_validate(f).model_dump(mode="json") for f in funcs],
         total=len(funcs),

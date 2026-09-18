@@ -13,6 +13,9 @@ from backend.app.services.ai_inference.contracts import AIErrorCode, AIInference
 from backend.app.services.ai_inference.experimental_gcb_provider import (
     ExperimentalGraphCodeBERTProvider,
 )
+from backend.app.services.ai_inference.local_torch_provider import (
+    LocalTorchProvider,
+)
 from backend.app.services.ai_inference.mock_provider import MockAIProvider
 
 
@@ -38,11 +41,14 @@ def get_ai_provider(provider_type: str | None = None) -> AIInferenceProvider:
     if target in ("mock", "test", "development"):
         return MockAIProvider()
 
+    if target in ("local_torch", "pytorch", "torch"):
+        return LocalTorchProvider()
+
     if target in ("graphcodebert", "gcb", "experimental"):
         return ExperimentalGraphCodeBERTProvider()
 
     raise AIInferenceError(
         code=AIErrorCode.PROVIDER_UNAVAILABLE,
         message=f"Configured AI provider '{target}' is not recognized or supported.",
-        details={"available_providers": ["mock", "graphcodebert"]},
+        details={"available_providers": ["mock", "local_torch", "graphcodebert"]},
     )

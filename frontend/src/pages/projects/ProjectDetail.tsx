@@ -3,7 +3,15 @@
 // ============================================================
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import {
+  getProjectUrl,
+  getSnapshotUrl,
+  getScanConfigUrl,
+  getScanProgressUrl,
+  getResultsUrl,
+  getConnectRepoUrl,
+} from '../../utils/routes';
 import {
   Play,
   FileCode2,
@@ -34,17 +42,21 @@ import { projectService } from '../../services/projectService';
 import { snapshotService } from '../../services/snapshotService';
 import { repositoryService } from '../../services/repositoryService';
 import { scanService } from '../../services/scanService';
-import { Project, SourceSnapshot, Repository, Scan } from '../../types';
+import { findingService } from '../../services/findingService';
+import { Project, SourceSnapshot, Repository, Scan, FindingListItem } from '../../types';
 import toast from 'react-hot-toast';
 
 export default function ProjectDetail() {
   const params = useParams<{ id?: string; projectId?: string }>();
   const id = params.projectId || params.id;
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [project, setProject] = useState<Project | null>(null);
   const [snapshots, setSnapshots] = useState<SourceSnapshot[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [scans, setScans] = useState<Scan[]>([]);
+  const [findings, setFindings] = useState<FindingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as any;
@@ -52,6 +64,13 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'snapshots' | 'repositories' | 'scans' | 'findings' | 'reports'
   >(validTabs.includes(tabParam) ? tabParam : 'overview');
+
+  useEffect(() => {
+    if (project?.public_id && id && id !== project.public_id) {
+      const search = location.search ? location.search : '';
+      navigate(`/projects/${project.public_id}${search}`, { replace: true });
+    }
+  }, [project, id, location.search, navigate]);
 
   useEffect(() => {
     if (tabParam && validTabs.includes(tabParam) && tabParam !== activeTab) {
@@ -72,17 +91,19 @@ export default function ProjectDetail() {
     async function load() {
       setLoading(true);
       try {
-        const [proj, snapsData, reposData, scansData] = await Promise.allSettled([
+        const [proj, snapsData, reposData, scansData, findingsData] = await Promise.allSettled([
           projectService.getProject(id!),
           snapshotService.listSnapshots(id!, { page_size: 50 }),
           repositoryService.listRepositories(id!),
           scanService.listScans({ project_id: id!, page_size: 50 }),
+          findingService.getProjectFindings(id!, { page_size: 50 }),
         ]);
 
         if (proj.status === 'fulfilled') setProject(proj.value);
         if (snapsData.status === 'fulfilled') setSnapshots(snapsData.value.items);
         if (reposData.status === 'fulfilled') setRepositories(reposData.value);
         if (scansData.status === 'fulfilled') setScans(scansData.value.items);
+        if (findingsData.status === 'fulfilled') setFindings(findingsData.value.items);
       } catch {
         // Handled
       } finally {
@@ -200,7 +221,7 @@ export default function ProjectDetail() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Link to={`/projects/${project.id}/repository`}>
+          <Link to={getConnectRepoUrl(project)}>
             <Button size="sm" className="text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
               <Plus className="w-3.5 h-3.5" />
               Connect Repository
@@ -219,7 +240,7 @@ export default function ProjectDetail() {
           </Button>
 
           {readySnapshots.length > 0 && (
-            <Link to={`/projects/${project.id}/scan-config`}>
+            <Link to={getScanConfigUrl(project)}>
               <Button size="sm" variant="outline" className="text-xs gap-1.5">
                 <Play className="w-3.5 h-3.5" />
                 Run Security Scan
@@ -299,7 +320,7 @@ export default function ProjectDetail() {
                   Immutable provenance boundary: Every security scan references a deterministic, tamper-proof source snapshot.
                 </CardDescription>
               </div>
-              <Link to={`/projects/${project.id}/repository`}>
+              <Link to={getConnectRepoUrl(project)}>
                 <Button size="sm" className="text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
                   <Plus className="w-3.5 h-3.5" /> Connect Repository
                 </Button>
@@ -313,7 +334,7 @@ export default function ProjectDetail() {
                   <p className="text-[11px] text-muted-foreground mt-0.5 max-w-md mx-auto">
                     Connect a GitHub or Git repository, or upload a source archive to create an immutable snapshot for vulnerability scanning.
                   </p>
-                  <Link to={`/projects/${project.id}/repository`}>
+                  <Link to={getConnectRepoUrl(project)}>
                     <Button size="sm" variant="outline" className="mt-3 text-xs gap-1.5">
                       <Plus className="w-3.5 h-3.5" /> Connect Source Code
                     </Button>
@@ -410,10 +431,10 @@ export default function ProjectDetail() {
                               <Layers className="w-4 h-4 text-primary shrink-0" />
                               <div className="min-w-0">
                                 <Link
-                                  to={`/projects/${project.id}/snapshots/${snap.id}`}
+                                  to={getSnapshotUrl(project, snap)}
                                   className="font-mono text-xs font-medium text-primary hover:underline"
                                 >
-                                  {snap.id.slice(0, 8)}...
+                                  {snap.public_id || snap.id}
                                 </Link>
                                 <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5">
                                   <span className="uppercase font-mono">{snap.source_type}</span>
@@ -442,13 +463,13 @@ export default function ProjectDetail() {
                               >
                                 {snap.status}
                               </Badge>
-                              <Link to={`/projects/${project.id}/snapshots/${snap.id}`}>
+                              <Link to={getSnapshotUrl(project, snap)}>
                                 <Button size="sm" variant="ghost" className="h-7 text-xs">
                                   Inspect
                                 </Button>
                               </Link>
                               {snap.status === 'ready' && (
-                                <Link to={`/projects/${project.id}/scan-config`}>
+                                <Link to={getScanConfigUrl(project)}>
                                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
                                     <Play className="w-3 h-3" /> Scan
                                   </Button>
@@ -477,7 +498,7 @@ export default function ProjectDetail() {
                 Canonical source states stored in object storage with deterministic metadata.
               </CardDescription>
             </div>
-            <Link to={`/projects/${project.id}/repository`}>
+            <Link to={getConnectRepoUrl(project)}>
               <Button size="sm" variant="outline" className="text-xs gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> New Snapshot
               </Button>
@@ -491,7 +512,7 @@ export default function ProjectDetail() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Upload an archive, individual files, or connect a Git repository to generate a snapshot.
                 </p>
-                <Link to={`/projects/${project.id}/repository`}>
+                <Link to={getConnectRepoUrl(project)}>
                   <Button variant="outline" size="sm" className="mt-4 text-xs gap-1.5">
                     <Plus className="w-3.5 h-3.5" /> Connect Source
                   </Button>
@@ -517,10 +538,10 @@ export default function ProjectDetail() {
                       <tr key={snap.id} className="hover:bg-hover transition-colors">
                         <td className="px-5 py-3 font-mono text-foreground font-medium">
                           <Link
-                            to={`/projects/${project.id}/snapshots/${snap.id}`}
+                            to={getSnapshotUrl(project, snap)}
                             className="hover:underline text-primary"
                           >
-                            {snap.id.slice(0, 8)}...
+                            {snap.public_id || snap.id}
                           </Link>
                         </td>
                         <td className="px-5 py-3">
@@ -576,13 +597,13 @@ export default function ProjectDetail() {
                         </td>
                         <td className="px-5 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Link to={`/projects/${project.id}/snapshots/${snap.id}`}>
+                            <Link to={getSnapshotUrl(project, snap)}>
                               <Button variant="ghost" size="sm" className="h-7 text-xs">
                                 View
                               </Button>
                             </Link>
                             {snap.status === 'ready' && (
-                              <Link to={`/projects/${project.id}/scan-config`}>
+                              <Link to={getScanConfigUrl(project)}>
                                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
                                   <Play className="w-3 h-3" /> Scan
                                 </Button>
@@ -610,7 +631,7 @@ export default function ProjectDetail() {
                 Remote repositories synchronized with automated commit tracking and branch selection.
               </CardDescription>
             </div>
-            <Link to={`/projects/${project.id}/repository`}>
+            <Link to={getConnectRepoUrl(project)}>
               <Button size="sm" variant="outline" className="text-xs gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Connect Repository
               </Button>
@@ -624,7 +645,7 @@ export default function ProjectDetail() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Connect a Git or GitHub repository to sync code commits into immutable snapshots.
                 </p>
-                <Link to={`/projects/${project.id}/repository`}>
+                <Link to={getConnectRepoUrl(project)}>
                   <Button variant="outline" size="sm" className="mt-4 text-xs gap-1.5">
                     <Plus className="w-3.5 h-3.5" /> Connect Repository
                   </Button>
@@ -747,7 +768,7 @@ export default function ProjectDetail() {
               <CardDescription>Historical and running vulnerability analysis pipelines for this project.</CardDescription>
             </div>
             {readySnapshots.length > 0 && (
-              <Link to={`/projects/${project.id}/scan-config`}>
+              <Link to={getScanConfigUrl(project)}>
                 <Button size="sm" className="text-xs gap-1.5">
                   <Play className="w-3.5 h-3.5" /> Start Scan
                 </Button>
@@ -765,7 +786,7 @@ export default function ProjectDetail() {
                     : 'Ingest a source snapshot before triggering a scan.'}
                 </p>
                 {readySnapshots.length > 0 && (
-                  <Link to={`/projects/${project.id}/scan-config`}>
+                  <Link to={getScanConfigUrl(project)}>
                     <Button size="sm" className="mt-4 text-xs gap-1.5">
                       <Play className="w-3.5 h-3.5" /> Start First Scan
                     </Button>
@@ -789,14 +810,14 @@ export default function ProjectDetail() {
                   <tbody className="divide-y divide-border/60">
                     {scans.map((scan) => (
                       <tr key={scan.id} className="hover:bg-hover transition-colors">
-                        <td className="px-5 py-3 font-mono text-foreground">{scan.id.slice(0, 8)}...</td>
+                        <td className="px-5 py-3 font-mono text-foreground">{scan.public_id || scan.id}</td>
                         <td className="px-5 py-3 font-mono text-muted-foreground">
                           {scan.source_snapshot_id ? (
                             <Link
-                              to={`/projects/${project.id}/snapshots/${scan.source_snapshot_id}`}
+                              to={getSnapshotUrl(project, scan.source_snapshot_public_id || scan.source_snapshot_id)}
                               className="hover:underline text-primary"
                             >
-                              {scan.source_snapshot_id.slice(0, 8)}...
+                              {scan.source_snapshot_public_id || scan.source_snapshot_version || 'Snapshot'}
                             </Link>
                           ) : (
                             'Legacy upload'
@@ -821,13 +842,13 @@ export default function ProjectDetail() {
                         </td>
                         <td className="px-5 py-3 text-right">
                           {scan.status === 'completed' ? (
-                            <Link to={`/projects/${project.id}/results?scan_id=${scan.id}`}>
+                            <Link to={getResultsUrl(project, scan)}>
                               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
                                 View Results <ArrowRight className="w-3 h-3" />
                               </Button>
                             </Link>
                           ) : (
-                            <Link to={`/projects/${project.id}/scan-progress?scan_id=${scan.id}`}>
+                            <Link to={getScanProgressUrl(project, scan)}>
                               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
                                 Progress <ArrowRight className="w-3 h-3" />
                               </Button>
@@ -847,24 +868,84 @@ export default function ProjectDetail() {
       {/* TAB 5: Findings */}
       {activeTab === 'findings' && (
         <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-40 text-muted-foreground" />
-            <p className="text-sm font-semibold text-foreground">Project Vulnerability Findings</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-              Findings are evaluated per scan execution. Open the latest completed scan to investigate persisted findings.
-            </p>
-            {latestCompletedScan ? (
-              <Link to={`/projects/${project.id}/results?scan_id=${latestCompletedScan.id}`}>
-                <Button size="sm" variant="outline" className="mt-4 text-xs gap-1.5">
-                  Open Latest Completed Scan Workspace <ArrowRight className="w-3.5 h-3.5" />
+          <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-sm">Vulnerability Findings</CardTitle>
+              <CardDescription>Persistent security vulnerabilities discovered across all scans for this project.</CardDescription>
+            </div>
+            {latestCompletedScan && (
+              <Link to={getResultsUrl(project, latestCompletedScan)}>
+                <Button size="sm" variant="outline" className="text-xs gap-1.5">
+                  Open Scan Workspace <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
               </Link>
+            )}
+          </CardHeader>
+          <CardContent className="p-0">
+            {findings.length === 0 ? (
+              <div className="text-center py-12 px-4 text-muted-foreground">
+                <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-40 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">No Findings Recorded</p>
+                <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                  Run a security scan on this project to evaluate vulnerabilities.
+                </p>
+                {readySnapshots.length > 0 && (
+                  <Link to={getScanConfigUrl(project)}>
+                    <Button size="sm" className="mt-4 text-xs gap-1.5">
+                      <Play className="w-3.5 h-3.5" /> Start Scan
+                    </Button>
+                  </Link>
+                )}
+              </div>
             ) : (
-              <p className="text-xs text-muted-foreground/80 mt-3">
-                {scans.length > 0
-                  ? 'No completed scans available yet. Wait for active scans to complete.'
-                  : 'Run a security scan on this project to evaluate vulnerabilities.'}
-              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[11px] font-semibold text-muted-foreground uppercase bg-muted/30 border-y border-border">
+                    <tr>
+                      <th className="px-5 py-3">Finding ID</th>
+                      <th className="px-5 py-3">Severity</th>
+                      <th className="px-5 py-3">Title</th>
+                      <th className="px-5 py-3">Status</th>
+                      <th className="px-5 py-3">Scan Ref</th>
+                      <th className="px-5 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {findings.map((finding) => (
+                      <tr key={finding.id} className="hover:bg-hover transition-colors">
+                        <td className="px-5 py-3 font-mono text-foreground">{finding.public_id || finding.id}</td>
+                        <td className="px-5 py-3">
+                          <Badge
+                            variant={
+                              finding.severity === 'critical' || finding.severity === 'high' ? 'destructive' :
+                              finding.severity === 'medium' ? 'warning' : 'secondary'
+                            }
+                            className="text-[10px]"
+                          >
+                            {finding.severity}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3 text-muted-foreground truncate max-w-xs">{finding.title}</td>
+                        <td className="px-5 py-3">
+                          <Badge variant={finding.status === 'open' ? 'destructive' : 'safe'} className="text-[10px]">
+                            {finding.status}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3 font-mono text-muted-foreground">
+                          {finding.scan_public_id || 'Unknown'}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <Link to={getResultsUrl(project, finding.latest_scan_public_id || finding.latest_scan_id || finding.scan_public_id, finding)}>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                              Investigate <ArrowRight className="w-3 h-3" />
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardContent>
         </Card>

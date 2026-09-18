@@ -25,6 +25,19 @@ class SnapshotRepository:
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def get_by_id_or_public_id(self, identifier: str | uuid.UUID) -> SourceSnapshot | None:
+        """Fetch snapshot by UUID or public identifier."""
+        from backend.app.core.identifiers import is_valid_uuid
+        from sqlalchemy import or_
+        id_str = str(identifier).strip()
+        if is_valid_uuid(id_str):
+            cond = or_(SourceSnapshot.id == uuid.UUID(id_str), SourceSnapshot.public_id == id_str)
+        else:
+            cond = (SourceSnapshot.public_id == id_str)
+        stmt = select(SourceSnapshot).where(cond)
+        res = await self.db.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def list_for_project(
         self, project_id: uuid.UUID, page: int = 1, page_size: int = 50
     ) -> tuple[Sequence[SourceSnapshot], int]:

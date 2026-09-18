@@ -35,6 +35,7 @@ class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    public_id: str | None = None
     organization_id: uuid.UUID | None = None
     name: str
     description: str | None = None

@@ -178,3 +178,13 @@ $RECYCLE.BIN/
 # ==========================================
 docker-compose.override.yml
 .docker/
+
+# ==========================================
+# Phase 6: Validation Workspaces & Patches
+# ==========================================
+validation_workspaces/
+/tmp/validation_workspaces/
+*.patch
+*.diff
+xai_artifacts/
+remediation_patches/

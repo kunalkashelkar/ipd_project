@@ -69,7 +69,17 @@ async def seed_test_rbac(session: AsyncSession) -> dict[str, Role]:
         ("api_key.create", "api_key"),
         ("api_key.revoke", "api_key"),
         ("audit.read", "audit"),
+        ("explanation.read", "explanation"),
+        ("explanation.generate", "explanation"),
+        ("remediation.read", "remediation"),
+        ("remediation.generate", "remediation"),
+        ("remediation.review", "remediation"),
+        ("remediation.apply", "remediation"),
+        ("remediation.validate", "remediation"),
+        ("finding.mark_fixed", "finding"),
+        ("finding.verify", "finding"),
     ]
+
 
     perms = {}
     for k, cat in perm_keys:

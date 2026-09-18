@@ -25,6 +25,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useScanProgress } from '../../hooks/useScanProgress';
 import { scanService } from '../../services/scanService';
+import { Scan } from '../../types';
+import { getProjectUrl, getResultsUrl, getScanProgressUrl } from '../../utils/routes';
 import toast from 'react-hot-toast';
 
 interface PipelineStageDef {
@@ -106,9 +108,24 @@ export default function ScanProgress() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const id = params.projectId || params.id;
-  const scanId = params.scanId || searchParams.get('scan_id');
+  const rawScanId = params.scanId || searchParams.get('scan_id') || searchParams.get('scan');
+  const [scan, setScan] = useState<Scan | null>(null);
 
-  const { status, progress, currentStage, errorMessage } = useScanProgress(scanId);
+  useEffect(() => {
+    if (!rawScanId) return;
+    scanService.getScan(rawScanId).then((data) => {
+      setScan(data);
+      const canonicalProject = data.project_public_id || data.project_id || id;
+      const canonicalScan = data.public_id || data.id || rawScanId;
+      if ((data.public_id && rawScanId === data.id && rawScanId !== data.public_id) ||
+          (data.project_public_id && id === data.project_id && id !== data.project_public_id)) {
+        navigate(getScanProgressUrl(canonicalProject, canonicalScan), { replace: true });
+      }
+    }).catch(() => {});
+  }, [rawScanId, id, navigate]);
+
+  const scanId = scan?.public_id || rawScanId;
+  const { status, progress, currentStage, errorMessage } = useScanProgress(rawScanId);
   const [isCancelling, setIsCancelling] = useState(false);
 
   // Determine stage progression index
@@ -127,24 +144,24 @@ export default function ScanProgress() {
   const isTerminal = isCompleted || isFailed || isCancelled || isTimedOut;
 
   const handleCancel = useCallback(async () => {
-    if (!scanId || isCancelling) return;
+    if (!rawScanId || isCancelling) return;
     setIsCancelling(true);
     try {
-      await scanService.cancelScan(scanId);
+      await scanService.cancelScan(rawScanId);
       toast.success('Scan cancellation requested.');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to cancel scan.');
     } finally {
       setIsCancelling(false);
     }
-  }, [scanId, isCancelling]);
+  }, [rawScanId, isCancelling]);
 
-  if (!scanId) {
+  if (!rawScanId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
         <p className="text-muted-foreground">No scan ID provided.</p>
-        <Button className="mt-4" onClick={() => navigate(`/projects/${id}`)}>
+        <Button className="mt-4" onClick={() => navigate(getProjectUrl(id))}>
           Back to Project
         </Button>
       </div>
@@ -197,14 +214,14 @@ export default function ScanProgress() {
           {isCompleted && (
             <Button
               size="sm"
-              onClick={() => navigate(`/projects/${id}/results?scan_id=${scanId}`)}
+              onClick={() => navigate(getResultsUrl(scan?.project_public_id || id, scan?.public_id || scanId))}
               className="gap-1.5 shadow-sm"
             >
               View Analysis Results <ArrowRight className="w-4 h-4" />
             </Button>
           )}
 
-          <Link to={`/projects/${id}`}>
+          <Link to={getProjectUrl(scan?.project_public_id || id)}>
             <Button variant="ghost" size="sm">
               Back to Project
             </Button>

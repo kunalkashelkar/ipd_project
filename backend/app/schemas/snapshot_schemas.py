@@ -16,6 +16,7 @@ class SourceSnapshotResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    public_id: str | None = None
     project_id: uuid.UUID
     repository_id: uuid.UUID | None = None
     repository_commit_id: uuid.UUID | None = None

@@ -22,6 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from backend.app.core.identifiers import PREFIX_SNAPSHOT, generate_public_id
 from backend.app.database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
@@ -41,6 +42,13 @@ class SourceSnapshot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "source_snapshots"
 
+    public_id: Mapped[str] = mapped_column(
+        String(32),
+        unique=True,
+        index=True,
+        nullable=False,
+        default=lambda: generate_public_id(PREFIX_SNAPSHOT),
+    )
     project_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
     )

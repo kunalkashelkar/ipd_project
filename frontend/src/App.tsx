@@ -91,6 +91,8 @@ function App() {
             <Route path="/projects/:projectId/scan-progress/:scanId" element={<ScanProgress />} />
             <Route path="/projects/:projectId/scan-progress" element={<ScanProgress />} />
             <Route path="/projects/:projectId/scans" element={<ProjectScans />} />
+            <Route path="/projects/:projectId/scans/:scanId" element={<ScanResultsWorkspace />} />
+            <Route path="/projects/:projectId/scans/:scanId/results" element={<ScanResultsWorkspace />} />
             <Route path="/projects/:projectId/findings" element={<ProjectFindings />} />
             <Route path="/projects/:projectId/reports" element={<ProjectReports />} />
             <Route path="/projects/:projectId/settings" element={<ProjectSettings />} />

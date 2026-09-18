@@ -164,12 +164,21 @@ class ScanService:
                 selectinload(Scan.stage_runs),
                 selectinload(Scan.artifacts),
                 selectinload(Scan.source_snapshot),
+                selectinload(Scan.project),
             )
         )
         res = await self.db.execute(stmt)
         scan = res.scalar_one_or_none()
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} not found")
+        scan.project_name = scan.project.name if scan.project else None
+        scan.project_public_id = scan.project.public_id if scan.project else None
+        scan.source_snapshot_version = (
+            scan.source_snapshot.source_version if scan.source_snapshot else None
+        )
+        scan.source_snapshot_public_id = (
+            scan.source_snapshot.public_id if scan.source_snapshot else None
+        )
         return scan
 
     async def get_scan_status(self, scan_id: uuid.UUID) -> Scan:
@@ -185,32 +194,36 @@ class ScanService:
         self,
         project_id: uuid.UUID | None = None,
         organization_id: uuid.UUID | None = None,
+        status: str | None = None,
         *,
         page: int = 1,
         page_size: int = 20,
     ) -> tuple[list[Scan], int]:
-        """List scans filtered by project and/or organization."""
+        """List scans filtered by project, status, and/or organization."""
+        from backend.app.models.finding import FindingOccurrence
+
+        stmt = (
+            select(Scan)
+            .join(Project, Scan.project_id == Project.id)
+            .options(
+                selectinload(Scan.project),
+                selectinload(Scan.source_snapshot),
+            )
+            .order_by(Scan.created_at.desc())
+        )
+        count_stmt = select(func.count(Scan.id)).join(Project, Scan.project_id == Project.id)
+
         if organization_id is not None:
-            stmt = (
-                select(Scan)
-                .join(Project, Scan.project_id == Project.id)
-                .where(Project.organization_id == organization_id)
-                .order_by(Scan.created_at.desc())
-            )
-            count_stmt = (
-                select(func.count(Scan.id))
-                .join(Project, Scan.project_id == Project.id)
-                .where(Project.organization_id == organization_id)
-            )
-            if project_id is not None:
-                stmt = stmt.where(Scan.project_id == project_id)
-                count_stmt = count_stmt.where(Scan.project_id == project_id)
-        elif project_id is not None:
-            stmt = select(Scan).where(Scan.project_id == project_id).order_by(Scan.created_at.desc())
-            count_stmt = select(func.count(Scan.id)).where(Scan.project_id == project_id)
-        else:
-            stmt = select(Scan).order_by(Scan.created_at.desc())
-            count_stmt = select(func.count(Scan.id))
+            stmt = stmt.where(Project.organization_id == organization_id)
+            count_stmt = count_stmt.where(Project.organization_id == organization_id)
+
+        if project_id is not None:
+            stmt = stmt.where(Scan.project_id == project_id)
+            count_stmt = count_stmt.where(Scan.project_id == project_id)
+
+        if status:
+            stmt = stmt.where(func.lower(Scan.status) == status.lower().strip())
+            count_stmt = count_stmt.where(func.lower(Scan.status) == status.lower().strip())
 
         res_total = await self.db.execute(count_stmt)
         total = res_total.scalar() or 0
@@ -219,6 +232,32 @@ class ScanService:
         stmt = stmt.offset(offset).limit(page_size)
         res = await self.db.execute(stmt)
         scans = list(res.scalars().all())
+
+        if scans:
+            scan_ids = [s.id for s in scans]
+            finding_counts_stmt = (
+                select(
+                    FindingOccurrence.scan_id,
+                    func.count(func.distinct(FindingOccurrence.finding_id)),
+                )
+                .where(FindingOccurrence.scan_id.in_(scan_ids))
+                .group_by(FindingOccurrence.scan_id)
+            )
+            fc_res = await self.db.execute(finding_counts_stmt)
+            counts_map = dict(fc_res.all())
+
+            for s in scans:
+                s.finding_count = counts_map.get(s.id, 0)
+                s.project_name = s.project.name if s.project else None
+                s.project_public_id = s.project.public_id if s.project else None
+                s.source_snapshot_version = (
+                    s.source_snapshot.source_version if s.source_snapshot else None
+                )
+                s.source_snapshot_public_id = (
+                    s.source_snapshot.public_id if s.source_snapshot else None
+                )
+                if not hasattr(s, "purpose") or not s.purpose:
+                    s.purpose = "GENERAL_SCAN"
 
         return scans, total
 

@@ -6,6 +6,8 @@ import { ArrowLeft, FolderPlus, UploadCloud, Info, GitBranch } from 'lucide-reac
 import { projectService } from '../../services/projectService';
 import toast from 'react-hot-toast';
 
+import { getProjectUrl } from '../../utils/routes';
+
 export default function CreateProject() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,7 +30,7 @@ export default function CreateProject() {
         default_branch: defaultBranch.trim() || 'main',
       });
       toast.success(`Project "${project.name}" created successfully!`);
-      navigate(`/projects/${project.id}`);
+      navigate(getProjectUrl(project));
     } catch (err: any) {
       const message =
         err?.response?.data?.message ||

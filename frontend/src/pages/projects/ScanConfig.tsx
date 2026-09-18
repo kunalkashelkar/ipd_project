@@ -22,12 +22,14 @@ import {
   Network,
   CheckCircle2,
   Lock,
+  FileDiff,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { snapshotService } from '../../services/snapshotService';
 import { uploadService } from '../../services/uploadService';
 import { scanService } from '../../services/scanService';
 import { SourceSnapshot, Upload } from '../../types';
+import { getScanProgressUrl, getConnectRepoUrl } from '../../utils/routes';
 import toast from 'react-hot-toast';
 
 export default function ScanConfig() {
@@ -102,7 +104,7 @@ export default function ScanConfig() {
           source_snapshot_id: selectedSnapshotId,
         });
         toast.success('Scan started against source snapshot!');
-        navigate(`/projects/${id}/scan-progress?scan_id=${scan.id}`);
+        navigate(getScanProgressUrl(id, scan));
       } catch (err: any) {
         toast.error(err?.response?.data?.message || 'Failed to start scan.');
       } finally {
@@ -117,7 +119,7 @@ export default function ScanConfig() {
           upload_id: selectedUploadId,
         });
         toast.success('Scan started!');
-        navigate(`/projects/${id}/scan-progress?scan_id=${scan.id}`);
+        navigate(getScanProgressUrl(id, scan));
       } catch (err: any) {
         toast.error(err?.response?.data?.message || 'Failed to start scan.');
       } finally {
@@ -170,7 +172,7 @@ export default function ScanConfig() {
               ) : snapshots.length === 0 && uploads.length === 0 ? (
                 <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-md border border-border space-y-2">
                   <p>No source code found. Ingest source code to create an immutable snapshot.</p>
-                  <Link to={`/projects/${id}/repository`}>
+                  <Link to={getConnectRepoUrl(id)}>
                     <Button size="sm" variant="outline" className="text-xs h-7 gap-1">
                       <Plus className="w-3 h-3" /> Connect Source
                     </Button>
@@ -258,7 +260,7 @@ export default function ScanConfig() {
                 {
                   id: 'static',
                   label: 'Static Code & Canonical Graph Pipeline',
-                  desc: 'AST, CFG, PDG, CPG, and Call Graph generation with cryptographic checksums.',
+                  desc: 'AST, CFG, CPG, and Call Graph generation with cryptographic checksums. (PDG: Unsupported in native fallback; requires Joern engine).',
                   icon: Shield,
                   statusLabel: 'Included (Phase 4)',
                   active: true,
@@ -266,7 +268,7 @@ export default function ScanConfig() {
                 {
                   id: 'taint',
                   label: 'Data Flow & Taint Analysis Engine',
-                  desc: 'Source, sink, and sanitizer detection with attack path evidence extraction.',
+                  desc: 'Source, sink, and sanitizer detection with attack path evidence extraction. (Zero detected taint paths does not guarantee code is secure).',
                   icon: Network,
                   statusLabel: 'Included (Phase 4)',
                   active: true,
@@ -274,26 +276,26 @@ export default function ScanConfig() {
                 {
                   id: 'ai',
                   label: 'AI Vulnerability Detection',
-                  desc: 'Deep learning vulnerability classification is reserved for Phase 5.',
+                  desc: 'Inference via configured AI provider (MockAIProvider / LocalTorchProvider boundary). Model registry tracks active runtime and version.',
                   icon: ScanEye,
-                  statusLabel: 'Phase 5 Reserved',
-                  active: false,
+                  statusLabel: 'Included (Phase 5)',
+                  active: true,
                 },
                 {
                   id: 'explain',
                   label: 'Explainability/XAI',
-                  desc: 'Node feature attribution and saliency maps. (Roadmap: Phase 6)',
+                  desc: 'Evidence-aware explanations and normalized attribution (Captum IG, SHAP, GNNExplainer, Attention). Unconfigured runtimes report explicit MODEL_NOT_READY.',
                   icon: Zap,
-                  statusLabel: 'Planned (Phase 6)',
-                  active: false,
+                  statusLabel: 'Included (Phase 6)',
+                  active: true,
                 },
                 {
                   id: 'fix',
                   label: 'Autonomous Remediation',
-                  desc: 'Automated patch generation and validation. (Roadmap: Phase 6)',
-                  icon: Zap,
-                  statusLabel: 'Planned (Phase 6)',
-                  active: false,
+                  desc: 'Remediation proposal generation, human review, isolated sandbox validation, and verification scans. No automatic merging or direct deployment.',
+                  icon: FileDiff,
+                  statusLabel: 'Included (Phase 6)',
+                  active: true,
                 },
               ].map((opt) => (
                 <div

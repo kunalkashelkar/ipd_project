@@ -12,11 +12,32 @@ import {
   FindingAssignment,
   FindingSuppression,
   ProjectFindingsSummary,
+  GlobalFindingsSummary,
   FindingSourceContext,
   PaginatedData,
 } from '../types';
 
 export const findingService = {
+  async getGlobalFindings(
+    params?: {
+      severity?: string;
+      status?: string;
+      page?: number;
+      page_size?: number;
+    }
+  ): Promise<PaginatedData<FindingListItem>> {
+    const { data } = await apiClient.get<PaginatedData<FindingListItem>>(
+      `/findings`,
+      { params }
+    );
+    return data;
+  },
+
+  async getGlobalFindingsSummary(): Promise<GlobalFindingsSummary> {
+    const { data } = await apiClient.get<GlobalFindingsSummary>(`/findings/summary`);
+    return data;
+  },
+
   async getProjectFindings(
     projectId: string,
     params?: {
