@@ -19,6 +19,20 @@ class ScanRepository(BaseRepository[Scan]):
     def __init__(self, db: AsyncSession):
         super().__init__(db, Scan)
 
+    async def get_by_id_or_public_id(self, id_or_pid: str | uuid.UUID) -> Scan | None:
+        """Resolve scan by internal UUID or public identifier (scn_...)."""
+        from backend.app.core.identifiers import is_valid_uuid
+        from sqlalchemy import or_
+
+        pid_str = str(id_or_pid).strip()
+        if is_valid_uuid(pid_str):
+            stmt = select(Scan).where(or_(Scan.id == uuid.UUID(pid_str), Scan.public_id == pid_str))
+        else:
+            stmt = select(Scan).where(Scan.public_id == pid_str)
+
+        res = await self.db.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def get_project_scans(
         self,
         project_id: uuid.UUID,

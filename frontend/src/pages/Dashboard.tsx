@@ -39,6 +39,24 @@ export default function Dashboard() {
     loadDashboard();
   }, [activeOrganization?.id]);
 
+  const healthScoreObj =
+    typeof metrics?.health_score === 'object' && metrics?.health_score !== null
+      ? metrics.health_score
+      : null;
+  const rawScore = healthScoreObj
+    ? healthScoreObj.score
+    : typeof metrics?.health_score === 'number'
+    ? metrics.health_score
+    : null;
+  const rawRating = healthScoreObj
+    ? healthScoreObj.rating
+    : metrics?.health_rating ?? null;
+  const rawStatus = healthScoreObj
+    ? healthScoreObj.status
+    : metrics?.health_status ?? (rawScore === null ? 'NO_DATA' : 'SCORED');
+
+  const isNoData = rawStatus === 'NO_DATA' || rawScore === null || rawScore === undefined;
+
   const stats = [
     {
       title: 'Total Projects',
@@ -48,7 +66,7 @@ export default function Dashboard() {
       iconColor: 'text-blue-400 bg-blue-500/10',
     },
     {
-      title: 'Critical Issues',
+      title: 'Critical Findings',
       value: (metrics?.severity_breakdown?.critical ?? metrics?.severity_breakdown?.CRITICAL ?? 0).toString(),
       caption: 'Immediate triage required',
       icon: AlertTriangle,
@@ -64,7 +82,7 @@ export default function Dashboard() {
     {
       title: 'Total Findings',
       value: metrics?.total_vulnerabilities?.toString() ?? '0',
-      caption: 'Detected weaknesses',
+      caption: 'Active security findings',
       icon: ShieldCheck,
       iconColor: 'text-emerald-400 bg-emerald-500/10',
     },
@@ -76,10 +94,10 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">
-            Security Overview
+            Workspace Security Overview
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Posture metrics and vulnerability monitoring for{' '}
+            Organization-wide posture metrics and vulnerability monitoring for{' '}
             <span className="font-semibold text-foreground">
               {activeOrganization?.name || 'Workspace'}
             </span>
@@ -97,7 +115,46 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Workspace Security Health Score Card */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Security Health Score</span>
+              <div className="p-1.5 rounded-md text-emerald-400 bg-emerald-500/10">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2">
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground my-1" />
+              ) : isNoData ? (
+                <>
+                  <div className="text-xl font-bold text-muted-foreground tracking-tight">No data</div>
+                  <span className="text-[11px] text-muted-foreground block mt-0.5">
+                    Unscored — scan required
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-foreground tracking-tight">
+                      {Math.round(rawScore!)}
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">/ 100</span>
+                    <span className="ml-auto text-xs font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                      Grade {rawRating || 'A'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground block mt-0.5">
+                    Authoritative workspace posture
+                  </span>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardContent className="p-4">
@@ -197,9 +254,15 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="h-40 flex flex-col items-center justify-center bg-muted/10 m-4 mt-0 rounded-md border border-dashed border-border p-4 text-center">
               <Activity className="w-6 h-6 opacity-30 mb-1.5 text-muted-foreground" />
-              <p className="text-xs font-semibold text-foreground">No Historical Risk Trend</p>
+              <p className="text-xs font-semibold text-foreground">
+                {metrics?.completed_scans && metrics.completed_scans > 1
+                  ? 'Historical Risk Trend'
+                  : 'No Historical Risk Trend'}
+              </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Historical risk timelines will be available with Phase 7 analytics.
+                {metrics?.completed_scans && metrics.completed_scans > 1
+                  ? 'Historical risk trend across completed scans.'
+                  : 'Historical risk trend is not available for this workspace yet.'}
               </p>
             </CardContent>
           </Card>

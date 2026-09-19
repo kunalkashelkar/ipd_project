@@ -1,5 +1,5 @@
 # ============================================================
-# Notification Router
+# Notification Router (Phase 7)
 # ============================================================
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ async def get_notifications(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     unread_only: bool = Query(False),
+    type: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -33,6 +34,7 @@ async def get_notifications(
         page=page,
         page_size=page_size,
         unread_only=unread_only,
+        notification_type=type,
     )
     return paginated_response(
         items=[NotificationResponse.model_validate(n).model_dump(mode="json") for n in notifications],
@@ -57,7 +59,8 @@ async def get_unread_count(
     )
 
 
-@router.put("/{notification_id}/read", summary="Mark notification as read")
+@router.patch("/{notification_id}/read", summary="Mark notification as read")
+@router.put("/{notification_id}/read", summary="Mark notification as read (alias)")
 async def mark_read(
     notification_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -72,12 +75,13 @@ async def mark_read(
     )
 
 
-@router.put("/read-all", summary="Mark all notifications as read")
+@router.post("/read-all", summary="Mark all notifications as read")
+@router.put("/read-all", summary="Mark all notifications as read (alias)")
 async def mark_all_read(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Mark all unread notifications as read for the user."""
+    """Mark all unread notifications as read for the current user."""
     service = NotificationService(db)
     count = await service.mark_all_as_read(current_user.id)
     return success_response(

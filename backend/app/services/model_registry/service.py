@@ -7,14 +7,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.exceptions import NotFoundError, ValidationError
+from backend.app.core.exceptions import ModelIntegrityError, NotFoundError, ValidationError
 from backend.app.models.model_registry import ModelVersion
 
 
@@ -128,3 +131,38 @@ class ModelRegistryService:
             stmt = stmt.where(ModelVersion.provider == provider)
         res = await self.db.execute(stmt)
         return list(res.scalars().all())
+
+    async def verify_artifact_integrity(self, model_version_id: uuid.UUID) -> bool:
+        """Verify the SHA-256 checksum of the registered model artifact before loading.
+
+        Enforces fail-closed security:
+        - If artifact_uri is missing and runtime is not mock, raises ModelIntegrityError.
+        - If registered checksum is provided, computes file SHA-256 and compares.
+        - If checksums mismatch, raises ModelIntegrityError.
+        """
+        mv = await self.db.get(ModelVersion, model_version_id)
+        if not mv:
+            raise NotFoundError(f"ModelVersion '{model_version_id}' not found.")
+
+        if not mv.artifact_uri:
+            if mv.runtime in ("mock", "development"):
+                return True
+            raise ModelIntegrityError(f"MODEL_INTEGRITY_FAILURE: Model version '{mv.version}' has no artifact URI.")
+
+        path = Path(mv.artifact_uri)
+        if not path.is_file():
+            raise ModelIntegrityError(f"MODEL_INTEGRITY_FAILURE: Model file not found at '{mv.artifact_uri}'.")
+
+        if mv.checksum:
+            h = hashlib.sha256()
+            with open(path, "rb") as f:
+                while chunk := f.read(65536):
+                    h.update(chunk)
+            computed = h.hexdigest()
+            if not hmac.compare_digest(computed.lower(), mv.checksum.lower()):
+                raise ModelIntegrityError(
+                    f"MODEL_INTEGRITY_FAILURE: Model '{mv.model_name}:{mv.version}' checksum mismatch. "
+                    f"Expected {mv.checksum}, got {computed}."
+                )
+        return True
+

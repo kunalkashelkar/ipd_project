@@ -122,6 +122,17 @@ class FindingCorrelationService:
                     )
                     self.db.add(history)
 
+                    try:
+                        from backend.app.services.notification_service import NotificationService
+                        notif_service = NotificationService(self.db)
+                        await notif_service.notify_finding_reopened(
+                            finding_id=existing_finding.id,
+                            finding_public_id=existing_finding.public_id,
+                            title=existing_finding.title,
+                            organization_id=org_id,
+                        )
+                    except Exception as re_err:
+                        logger.warning("Failed to emit finding_reopened notification: {err}", err=re_err)
 
                 finding_to_link = existing_finding
             else:

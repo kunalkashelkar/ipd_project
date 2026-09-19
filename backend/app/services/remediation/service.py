@@ -173,6 +173,21 @@ class RemediationService:
         )
         await self.db.commit()
 
+        if user_id:
+            try:
+                from backend.app.services.notification_service import NotificationService
+                notif = NotificationService(self.db)
+                await notif.notify_fix_ready(
+                    finding_id=finding.id,
+                    finding_public_id=finding.public_id,
+                    user_id=user_id,
+                    organization_id=organization_id,
+                    remediation_id=remediation.id,
+                )
+                await self.db.commit()
+            except Exception as e:
+                logger.warning("Failed to emit fix_ready notification: {err}", err=e)
+
         return remediation
 
     async def review_remediation(
@@ -270,6 +285,27 @@ class RemediationService:
             validation.id,
             actor_id=user_id,
         )
+
+        # Emit notification only for successful validation
+        if user_id and completed.status == "passed":
+            try:
+                from backend.app.services.notification_service import NotificationService
+                rem = await self.db.get(Remediation, remediation_id)
+                if rem:
+                    f = await self.db.get(Finding, rem.finding_id)
+                    if f:
+                        notif = NotificationService(self.db)
+                        await notif.notify_fix_validated(
+                            finding_id=f.id,
+                            finding_public_id=f.public_id,
+                            user_id=user_id,
+                            organization_id=organization_id,
+                            validation_status=completed.status,
+                        )
+                        await self.db.commit()
+            except Exception as val_notif_err:
+                logger.warning("Failed to emit fix_validated notification: {err}", err=val_notif_err)
+
         return completed
 
     async def get_verification_status(

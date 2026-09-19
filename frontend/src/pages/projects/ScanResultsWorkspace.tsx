@@ -63,6 +63,7 @@ import { scanService } from '../../services/scanService';
 import { findingService } from '../../services/findingService';
 import { projectService } from '../../services/projectService';
 import { remediationService } from '../../services/remediationService';
+import { teamService } from '../../services/teamService';
 import {
   Scan,
   AnalysisArtifact,
@@ -76,6 +77,7 @@ import {
   Remediation,
   RemediationValidation,
   VerificationStatus,
+  OrganizationMember,
 } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -147,9 +149,13 @@ export default function ScanResultsWorkspace() {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Comment input
+  // Comment & Activity input
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<OrganizationMember[]>([]);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('');
 
   // Suppression modal / form
   const [showSuppressModal, setShowSuppressModal] = useState(false);
@@ -349,30 +355,6 @@ export default function ScanResultsWorkspace() {
     }
   };
 
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFindingId || !newComment.trim()) return;
-
-    setSubmittingComment(true);
-    try {
-      const added = await findingService.addComment(selectedFindingId, {
-        content: newComment.trim(),
-      });
-      if (findingDetail) {
-        setFindingDetail({
-          ...findingDetail,
-          comments: [...findingDetail.comments, added],
-        });
-      }
-      setNewComment('');
-      toast.success('Comment added');
-    } catch {
-      toast.error('Failed to add comment');
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
-
   const handleSuppress = async () => {
     if (!selectedFindingId || !suppressReason.trim()) {
       toast.error('Please provide a reason');
@@ -410,6 +392,58 @@ export default function ScanResultsWorkspace() {
       toast.error(err.response?.data?.message || 'Failed to reopen finding');
     }
   };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFindingId || !newComment.trim()) return;
+    setSubmittingComment(true);
+    try {
+      await findingService.addComment(selectedFindingId, { content: newComment.trim() });
+      setNewComment('');
+      toast.success('Comment added');
+      const updated = await findingService.getFindingDetail(selectedFindingId);
+      setFindingDetail(updated);
+      const act = await findingService.getActivity(selectedFindingId);
+      setActivities(act);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to add comment');
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleAssignFinding = async (userId: string) => {
+    if (!selectedFindingId) return;
+    try {
+      await findingService.assignFinding(selectedFindingId, { user_id: userId });
+      toast.success('Finding assigned successfully');
+      const updated = await findingService.getFindingDetail(selectedFindingId);
+      setFindingDetail(updated);
+      const act = await findingService.getActivity(selectedFindingId);
+      setActivities(act);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to assign finding');
+    }
+  };
+
+  // Fetch activities and team members when Comments tab is active
+  useEffect(() => {
+    if (findingSubTab === 'comments' && selectedFindingId) {
+      setLoadingActivities(true);
+      findingService
+        .getActivity(selectedFindingId)
+        .then((act) => setActivities(act))
+        .catch(() => setActivities([]))
+        .finally(() => setLoadingActivities(false));
+
+      if (project?.organization_id) {
+        teamService
+          .listMembers(project.organization_id)
+          .then((members) => setTeamMembers(members))
+          .catch(() => setTeamMembers([]));
+      }
+    }
+  }, [findingSubTab, selectedFindingId, project?.organization_id]);
 
   const handleDownloadArtifact = async (artifact: AnalysisArtifact) => {
     if (!scanId) return;
@@ -1161,14 +1195,13 @@ export default function ScanResultsWorkspace() {
                           </div>
                         </div>
 
-                        {/* Phase 6 Reserved Banner */}
+                        {/* Remediation Summary Banner */}
                         <div className="p-3 rounded-lg border border-border/40 bg-muted/10 text-muted-foreground space-y-1">
                           <span className="font-semibold text-foreground block">
-                            Remediation & Patching (Phase 6 Reserved)
+                            Remediation & Patching
                           </span>
                           <p className="text-[11px]">
-                            Automated explainability attribution (Captum/GNNExplainer) and LLM-assisted
-                            patch verification are reserved for Phase 6. No unverified patches are shown.
+                            Review candidate patches, sandbox validation outcomes, and explainability attributions in the Remediation tab.
                           </p>
                         </div>
                       </div>
@@ -1288,7 +1321,7 @@ export default function ScanResultsWorkspace() {
                     {findingSubTab === 'graphs' && (
                       <div className="space-y-3 text-xs">
                         <span className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider block">
-                          Correlated Graph Artifacts (Phase 4 Foundation)
+                          Correlated Graph Artifacts
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {canonicalGraphs.map((g) => {
@@ -2008,6 +2041,131 @@ export default function ScanResultsWorkspace() {
                         })()}
                       </div>
                     )}
+
+                    {findingSubTab === 'occurrences' && (
+                      <div className="space-y-3 text-xs">
+                        <div className="p-3 bg-muted/20 rounded border border-border/40 text-muted-foreground">
+                          <span className="font-semibold text-foreground block mb-1">Authoritative Occurrences</span>
+                          Multiple occurrences across revisions or files belong to this single canonical Finding ({findingDetail.fingerprint.slice(0, 16)}...). They do not inflate organization finding counts.
+                        </div>
+                        <div className="divide-y divide-border/40 border border-border/40 rounded-lg overflow-hidden">
+                          {findingDetail.occurrences.map((occ, idx) => (
+                            <div key={occ.id} className="p-3 bg-card/40 flex items-start justify-between">
+                              <div>
+                                <span className="font-mono font-semibold text-foreground block">
+                                  {occ.file_path}:{occ.start_line}
+                                </span>
+                                <span className="text-muted-foreground text-[11px] block mt-0.5">
+                                  Function: {occ.function_name || '<global>'} &bull; Scan: {occ.scan_id ? occ.scan_id.slice(0, 8) : 'N/A'}
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] uppercase">
+                                Occurrence #{idx + 1}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {findingSubTab === 'comments' && (
+                      <div className="space-y-4 text-xs">
+                        {/* Assignment Row */}
+                        <div className="p-3 bg-muted/20 rounded-lg border border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider block">
+                              Assigned Owner
+                            </span>
+                            <span className="text-sm font-semibold text-foreground mt-0.5 block">
+                              {findingDetail.current_assignment
+                                ? findingDetail.current_assignment.assigned_to?.name ||
+                                  findingDetail.current_assignment.assigned_to?.email ||
+                                  'Assigned Member'
+                                : 'Unassigned'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              className="h-8 rounded border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                              value={selectedAssigneeId}
+                              onChange={(e) => {
+                                setSelectedAssigneeId(e.target.value);
+                                if (e.target.value) handleAssignFinding(e.target.value);
+                              }}
+                            >
+                              <option value="">Assign to member...</option>
+                              {teamMembers.map((m) => (
+                                <option key={m.user_id} value={m.user_id}>
+                                  {m.user_name} ({m.user_email})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Activity & Comments Timeline */}
+                        <div className="space-y-3">
+                          <span className="text-xs font-semibold text-foreground block">
+                            Activity & Comment Stream
+                          </span>
+                          {loadingActivities ? (
+                            <div className="py-6 text-center text-muted-foreground">Loading activity...</div>
+                          ) : activities.length === 0 && findingDetail.comments.length === 0 ? (
+                            <div className="p-4 text-center border border-border/40 rounded bg-muted/10 text-muted-foreground text-xs">
+                              No collaboration activity or comments yet.
+                            </div>
+                          ) : (
+                            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                              {activities.map((act) => (
+                                <div
+                                  key={act.id}
+                                  className="p-2.5 rounded border border-border/40 bg-card/60 text-xs space-y-1"
+                                >
+                                  <div className="flex justify-between items-center text-[11px]">
+                                    <span className="font-semibold text-foreground">
+                                      {act.actor_name || 'System'}
+                                    </span>
+                                    <span className="text-muted-foreground font-mono">
+                                      {act.created_at ? new Date(act.created_at).toLocaleString() : ''}
+                                    </span>
+                                  </div>
+                                  <p className="text-foreground/90 leading-relaxed">
+                                    {act.description || act.title}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add Comment Input */}
+                        <form onSubmit={handleAddComment} className="pt-2 border-t border-border/40 space-y-2">
+                          <div className="relative">
+                            <textarea
+                              rows={2}
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              placeholder="Write a comment... (Type @username to mention a teammate)"
+                              className="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] text-muted-foreground">
+                              Valid @mentions trigger real-time in-app notifications
+                            </span>
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={submittingComment || !newComment.trim()}
+                              className="gap-1.5 text-xs h-7"
+                            >
+                              <Send className="w-3 h-3" />
+                              {submittingComment ? 'Posting...' : 'Post Comment'}
+                            </Button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
                   </Card>
 
                 ) : (
@@ -2026,7 +2184,7 @@ export default function ScanResultsWorkspace() {
         <div className="space-y-4">
           <div className="p-4 rounded-lg bg-card/50 border border-border text-xs text-muted-foreground leading-relaxed">
             <span className="font-semibold text-foreground block mb-1">
-              Phase 4 Canonical Graph Pipeline
+              Canonical Graph Pipeline
             </span>
             These program graphs are generated deterministically during scan processing and stored in
             MinIO object storage. The AI Inference Provider consumes these exact canonical artifacts.
@@ -2112,7 +2270,7 @@ export default function ScanResultsWorkspace() {
         <div className="space-y-4">
           <div className="p-4 rounded-lg bg-card/50 border border-border text-xs text-muted-foreground leading-relaxed">
             <span className="font-semibold text-foreground block mb-1">
-              Phase 4 Data Flow & Taint Analysis
+              Data Flow & Taint Analysis
             </span>
             Interprocedural data flow tracking identifies untrusted external inputs propagating through
             the code property graph to sensitive execution sinks.

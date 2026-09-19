@@ -345,6 +345,44 @@ async def orchestrate_scan(self, scan_id: str):
             )
             logger.info("Scan {id} completed successfully with {n} findings!", id=scan_id, n=len(findings))
 
+            # ── 9. DOMAIN NOTIFICATION EMISSIONS ───────────────────
+            try:
+                from backend.app.models.project import Project
+                from backend.app.services.notification_service import NotificationService
+
+                stmt_prj = select(Project).where(Project.id == scan.project_id)
+                res_prj = await db.execute(stmt_prj)
+                project = res_prj.scalar_one_or_none()
+                if project:
+                    notif_service = NotificationService(db)
+                    await notif_service.notify_scan_completed(
+                        scan_id=scan.id,
+                        public_scan_id=scan.public_id,
+                        project_id=project.id,
+                        project_name=project.name,
+                        organization_id=project.organization_id,
+                    )
+                    for f in findings:
+                        if getattr(f, "severity", "").lower() == "critical":
+                            first_seen = getattr(f, "first_seen_at", None)
+                            last_seen = getattr(f, "last_seen_at", None)
+                            is_new_finding = (
+                                first_seen is not None
+                                and last_seen is not None
+                                and abs((last_seen - first_seen).total_seconds()) < 5
+                            )
+                            if is_new_finding:
+                                await notif_service.notify_critical_finding(
+                                    finding_id=f.id,
+                                    finding_public_id=f.public_id,
+                                    title=f.title,
+                                    project_id=project.id,
+                                    organization_id=project.organization_id,
+                                )
+                    await db.commit()
+            except Exception as notif_err:
+                logger.warning("Failed to emit scan completion notifications: {err}", err=notif_err)
+
         except ProcessCancelledError as e:
             logger.warning("Scan {id} was cancelled during execution: {err}", id=scan_id, err=e)
             await lifecycle.transition_stage(

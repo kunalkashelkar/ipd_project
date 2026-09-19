@@ -57,11 +57,18 @@ apiClient.interceptors.response.use(
     if (error.response) {
       const status = error.response.status;
       const data = error.response.data;
+      const structError = (data as any)?.error;
+      const errorList = (data as any)?.errors || structError?.details;
+      const specificFieldErr = Array.isArray(errorList) && errorList.length > 0 ? `${errorList[0].message} on ${errorList[0].field}` : null;
       const message =
-        data?.message ||
-        data?.detail ||
-        (Array.isArray(data?.details) && data.details[0]?.message) ||
-        'An unexpected error occurred';
+        (structError?.message && structError.message !== 'Validation failed')
+          ? structError.message
+          : specificFieldErr && (!data?.message || data.message === 'Validation failed')
+          ? `Validation failed: ${specificFieldErr}`
+          : data?.message ||
+            data?.detail ||
+            (Array.isArray(data?.details) && data.details[0]?.message) ||
+            'An unexpected error occurred';
 
       if (status === 401) {
         authStorage.clearSession();

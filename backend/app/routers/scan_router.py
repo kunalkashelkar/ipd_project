@@ -16,7 +16,7 @@ from backend.app.core.authorization import (
     require_project_access,
     require_scan_access,
 )
-from backend.app.core.exceptions import AuthorizationError, NotFoundError
+from backend.app.core.rate_limit import RateLimiter
 from backend.app.core.response import paginated_response, success_response
 from backend.app.database.session import AsyncSession, get_db
 from backend.app.models.analysis_artifact import AnalysisArtifact
@@ -36,7 +36,12 @@ from backend.app.services.scan_service import ScanService
 router = APIRouter(prefix="/scans", tags=["Scans"])
 
 
-@router.post("", summary="Create and start a new scan", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    summary="Create and start a new scan",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RateLimiter(times=30, seconds=60, scope="scans:create"))],
+)
 async def create_scan(
     body: ScanCreate,
     current_user: User = Depends(get_current_user),

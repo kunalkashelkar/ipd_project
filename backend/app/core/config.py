@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     )
 
     # ── Application ────────────────────────────────────────
-    app_name: str = "VulnScanBackend"
+    app_name: str = "VulnScan"
     app_env: str = "development"
     debug: bool = True
 
@@ -53,8 +53,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
-    # ── Redis ──────────────────────────────────────────────
+    # ── Redis & Rate Limiting ──────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
+    rate_limiting_enabled: bool = True
 
     # ── Celery ─────────────────────────────────────────────
     celery_broker_url: str = "redis://localhost:6379/1"

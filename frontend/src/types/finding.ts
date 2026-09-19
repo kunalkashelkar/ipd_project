@@ -138,6 +138,7 @@ export interface FindingDetail {
   occurrences: FindingOccurrence[];
   status_history: FindingStatusHistory[];
   assignments: FindingAssignment[];
+  current_assignment?: FindingAssignment | null | any;
   comments: FindingComment[];
   suppressions: FindingSuppression[];
 }

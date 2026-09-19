@@ -83,9 +83,9 @@ const PIPELINE_STAGES: PipelineStageDef[] = [
   {
     id: 'ai_analysis',
     name: 'AI Analysis',
-    description: 'Deep learning classification (Phase 5 reserved — not configured).',
+    description: 'Deep learning classification and graph neural network vulnerability detection.',
     icon: Cpu,
-    isAiReserved: true,
+    isAiReserved: false,
   },
   {
     id: 'post_processing',
@@ -365,12 +365,6 @@ export default function ScanProgress() {
                       >
                         {stage.name}
                       </span>
-
-                      {stage.isAiReserved && (
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border font-medium">
-                          Phase 5 Reserved (Not Configured)
-                        </span>
-                      )}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {stage.description}

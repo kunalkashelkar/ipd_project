@@ -372,6 +372,11 @@ class ValidationService:
                     {"status": "FAIL", "message": f"Tests failed: {stdout.decode('utf-8', errors='replace')[:200]}"},
                 )
         except asyncio.TimeoutError:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
             return (
                 {"status": "PASS", "message": "Build completed."},
                 {"status": "FAIL", "message": "Test execution timed out after 30 seconds."},

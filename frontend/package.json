@@ -1,8 +1,8 @@
 {
-  "name": "hybrid-xai-vuln-detection-frontend",
+  "name": "vulnscan-frontend",
   "private": true,
   "version": "0.1.0",
-  "description": "Interactive dashboard for the Hybrid XAI Vulnerability Detection system.",
+  "description": "Interactive web interface for the VulnScan security platform.",
   "type": "module",
   "scripts": {
     "dev": "vite",

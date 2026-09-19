@@ -67,7 +67,7 @@ export default function ResetPassword() {
             <div className="w-12 h-12 mx-auto rounded-lg bg-primary flex items-center justify-center shadow-soft group-hover:scale-105 transition-transform">
               <ShieldCheck className="w-7 h-7 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">XAI Platform</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">VulnScan</h1>
           </Link>
           <p className="mt-1 text-xs text-muted-foreground">Set a new account password</p>
         </div>

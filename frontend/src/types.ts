@@ -96,6 +96,7 @@ export interface Project {
   language: string | null;
   default_branch: string | null;
   owner_id: string;
+  organization_id?: string;
   is_archived: boolean;
   created_at: string;
   updated_at: string;
@@ -405,31 +406,106 @@ export interface Vulnerability {
   is_fixed: boolean;
 }
 
-// ── Reports ──────────────────────────────────────────────────
+// ── Reports (Phase 7) ────────────────────────────────────────
+
+export interface ReportFile {
+  id: string;
+  report_id: string;
+  format: 'pdf' | 'html' | 'json' | 'csv';
+  storage_key: string;
+  content_type: string;
+  size_bytes: number;
+  checksum_sha256: string;
+  created_at: string;
+}
 
 export interface Report {
   id: string;
   public_id: string;
   scan_id: string;
-  format: string;
-  status: string;
+  project_id?: string;
+  organization_id?: string;
+  created_by?: string;
+  report_type: 'developer' | 'security' | 'executive';
+  format: 'pdf' | 'html' | 'json' | 'csv';
+  status: 'pending' | 'queued' | 'generating' | 'completed' | 'failed';
   file_path: string | null;
+  generated_at?: string | null;
+  error_message?: string | null;
+  config?: Record<string, any> | null;
   created_at: string;
+  files?: ReportFile[];
 }
 
-// ── Notifications ────────────────────────────────────────────
+// ── Notifications (Phase 7) ──────────────────────────────────
 
 export interface Notification {
   id: string;
+  public_id?: string;
+  organization_id?: string;
   title: string;
-  message: string;
+  message?: string;
+  body?: string;
   read: boolean;
-  type: 'info' | 'success' | 'warning' | 'error';
-  timestamp: string;
+  type: string;
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  timestamp?: string;
+  created_at: string;
   link?: string;
+  link_url?: string;
+  entity_type?: string;
+  entity_id?: string;
 }
 
-// ── Analytics ────────────────────────────────────────────────
+// ── Analytics (Phase 7) ──────────────────────────────────────
+
+export interface SecurityHealthScore {
+  score: number | null;
+  rating: 'A' | 'B' | 'C' | 'D' | 'F' | null;
+  status?: string;
+  message?: string;
+  version: string;
+  weights?: Record<string, number>;
+  penalties?: Record<string, number>;
+  recovery_bonus?: number;
+}
+
+export interface AnalyticsMetrics {
+  total_findings: number;
+  active_findings: number;
+  resolved_findings: number;
+  critical_findings: number;
+  severity_breakdown: Record<string, number>;
+  cwe_distribution: Array<{ cwe_id: string; count: number }>;
+  risk_trend: Array<{ date: string; avg_risk_score: number; active_findings: number }>;
+  finding_trend?: Array<{ date: string; new_findings: number; fixed_findings: number }>;
+  mttr_hours: number | null;
+  remediation_rate: number;
+  false_positive_rate: number;
+  scan_success_rate?: number;
+  health_score: SecurityHealthScore;
+}
+
+export interface ScanComparisonResult {
+  baseline_scan: {
+    id: string;
+    public_id: string;
+    completed_at?: string;
+    created_at?: string;
+  } | null;
+  current_scan: {
+    id: string;
+    public_id: string;
+    completed_at?: string;
+    created_at?: string;
+  };
+  existing_count: number;
+  new_count: number;
+  fixed_count: number;
+  existing_findings: Array<{ id: string; public_id: string; title: string; severity: string; fingerprint: string }>;
+  new_findings: Array<{ id: string; public_id: string; title: string; severity: string; fingerprint: string }>;
+  fixed_findings: Array<{ id: string; public_id: string; title: string; severity: string; fingerprint: string }>;
+}
 
 export interface DashboardMetrics {
   total_projects: number;
@@ -441,14 +517,46 @@ export interface DashboardMetrics {
   recent_scans: Scan[];
   scan_success_rate?: number;
   vulnerabilities_by_cwe?: Array<{ cwe_id: string; count: number }>;
+  health_score?: number | null | SecurityHealthScore;
+  health_rating?: string | null;
+  health_status?: string;
+  score_version?: string;
+  active_findings?: number;
 }
 
-export interface AnalyticsSummary {
-  total_projects: number;
-  total_scans_this_month: number;
-  avg_risk_score: number;
-  vulnerabilities_by_severity: Record<string, number>;
-  top_cwe: Array<{ cwe: string; count: number }>;
+// ── PR Security & Gates (Phase 7) ────────────────────────────
+
+export interface SecurityGatePolicy {
+  id: string;
+  project_id: string;
+  block_new_critical: boolean;
+  block_new_high: boolean;
+  block_secrets: boolean;
+  cvss_threshold: number | null;
+  version: string;
+  updated_at?: string;
+}
+
+export interface PRSecurityResult {
+  id: string;
+  public_id: string;
+  project_id: string;
+  repository_id: string;
+  pull_request_number: number;
+  pr_head_sha: string;
+  pr_base_sha?: string | null;
+  pr_branch?: string | null;
+  pr_title?: string | null;
+  baseline_scan_id?: string | null;
+  pr_scan_id: string;
+  existing_count: number;
+  new_count: number;
+  fixed_count: number;
+  gate_result: 'PASS' | 'FAIL' | 'SKIPPED';
+  status: 'completed' | 'failed' | 'running';
+  summary?: string | null;
+  created_at: string;
+  completed_at?: string | null;
 }
 
 // ── API Response Envelope ────────────────────────────────────

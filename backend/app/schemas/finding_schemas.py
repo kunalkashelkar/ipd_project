@@ -219,3 +219,14 @@ class FindingSourceContextResponse(BaseModel):
     source_snippet: str
     snapshot_id: uuid.UUID
     is_snapshot_immutable: bool = True
+
+
+class FindingActivityItem(BaseModel):
+    id: str
+    activity_type: str
+    title: str
+    description: str | None = None
+    actor_name: str | None = None
+    created_at: datetime
+    metadata: dict[str, Any] | None = None
+

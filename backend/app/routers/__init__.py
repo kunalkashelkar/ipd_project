@@ -6,7 +6,9 @@ from backend.app.routers.analytics_router import router as analytics_router
 from backend.app.routers.api_key_router import router as api_key_router
 from backend.app.routers.audit_router import router as audit_router
 from backend.app.routers.auth_router import router as auth_router
+from backend.app.routers.ci_router import router as ci_router
 from backend.app.routers.finding_router import router as finding_router
+from backend.app.routers.github_webhook_router import router as github_webhook_router
 from backend.app.routers.health_router import router as health_router
 from backend.app.routers.model_router import router as model_router
 from backend.app.routers.notification_router import router as notification_router
@@ -29,7 +31,9 @@ __all__ = [
     "api_key_router",
     "audit_router",
     "auth_router",
+    "ci_router",
     "finding_router",
+    "github_webhook_router",
     "health_router",
     "invitation_router",
     "model_router",
@@ -47,4 +51,3 @@ __all__ = [
     "websocket_router",
     "xai_router",
 ]
-

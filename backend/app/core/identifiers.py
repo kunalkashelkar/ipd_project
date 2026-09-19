@@ -16,10 +16,12 @@ PREFIX_SCAN = "scn"
 PREFIX_SNAPSHOT = "snp"
 PREFIX_REPORT = "rpt"
 PREFIX_FINDING = "fnd"
+PREFIX_NOTIFICATION = "ntf"
+PREFIX_PR_RESULT = "pr"
 
 ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
 UUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
-PUBLIC_ID_PATTERN = re.compile(r"^(prj|scn|snp|rpt|fnd)_[a-z0-9]{12}$", re.I)
+PUBLIC_ID_PATTERN = re.compile(r"^(prj|scn|snp|rpt|fnd|ntf|pr)_[a-z0-9]{12}$", re.I)
 
 
 def generate_public_id(prefix: str, length: int = 12) -> str:

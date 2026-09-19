@@ -345,6 +345,15 @@ async def disconnect_repository(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repository not found")
 
     updated = await repo_vcs_repo.disconnect(repo_id)
+
+    from backend.app.services.notification_service import NotificationService
+    notif_svc = NotificationService(db)
+    await notif_svc.notify_repository_disconnected(
+        repo_id=repo.id,
+        repo_url=repo.repository_url,
+        organization_id=active_org_id,
+    )
+
     return success_response(
         data=RepositoryResponse.model_validate(updated).model_dump(mode="json"),
         message="Repository disconnected successfully",

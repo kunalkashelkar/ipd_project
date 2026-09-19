@@ -28,7 +28,9 @@ from backend.app.routers import (
     api_key_router,
     audit_router,
     auth_router,
+    ci_router,
     finding_router,
+    github_webhook_router,
     health_router,
     invitation_router,
     model_router,
@@ -78,7 +80,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title=settings.app_name,
-    description="Backend API for the AI-Ready Vulnerability Detection Framework.",
+    description="VulnScan — AI-assisted software vulnerability detection and remediation platform.",
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -104,6 +106,7 @@ API_PREFIX = "/api/v1"
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(invitation_router, prefix=API_PREFIX)
 app.include_router(health_router)
+app.include_router(health_router, prefix=API_PREFIX)
 
 # Batch 2: Organizations & RBAC
 app.include_router(organization_router, prefix=API_PREFIX)
@@ -132,6 +135,10 @@ app.include_router(model_router, prefix=API_PREFIX)
 app.include_router(websocket_router)
 app.include_router(notification_router, prefix=API_PREFIX)
 app.include_router(analytics_router, prefix=API_PREFIX)
+
+# Batch 7: GitHub PR Security, Security Gates & CI/CD
+app.include_router(github_webhook_router, prefix=API_PREFIX)
+app.include_router(ci_router, prefix=API_PREFIX)
 
 
 

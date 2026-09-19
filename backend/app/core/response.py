@@ -52,16 +52,29 @@ def error_response(
     message: str = "An error occurred",
     errors: list[dict] | None = None,
     status_code: int = 400,
+    code: str | None = None,
+    request_id: str | None = None,
 ) -> dict:
-    """Build an error response dict.
+    """Build an error response dict conforming to canonical structured error contract.
 
     ``errors`` should be a list of ``{"field": ..., "message": ...}`` dicts.
     """
+    import uuid
+
+    resolved_code = code or ("VALIDATION_FAILED" if status_code == 422 else f"HTTP_{status_code}")
+    req_id = request_id or f"req_{str(uuid.uuid4())[:8]}"
+
     return {
         "status": "error",
         "message": message,
         "data": None,
         "errors": errors or [],
+        "error": {
+            "code": resolved_code,
+            "message": message,
+            "details": errors or [],
+            "request_id": req_id,
+        },
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

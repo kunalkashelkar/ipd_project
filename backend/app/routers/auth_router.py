@@ -7,6 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 
 from backend.app.core.authorization import get_current_user_and_session
+from backend.app.core.rate_limit import RateLimiter
 from backend.app.core.response import success_response
 from backend.app.database.session import AsyncSession, get_db
 from backend.app.models.session import UserSession
@@ -36,7 +37,11 @@ def _get_client_ip(request: Request) -> str | None:
     return None
 
 
-@router.post("/register", summary="Register user with new organization workspace")
+@router.post(
+    "/register",
+    summary="Register user with new organization workspace",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, scope="auth:register"))],
+)
 async def register(
     body: RegisterRequest,
     request: Request,
@@ -64,7 +69,11 @@ async def register(
     )
 
 
-@router.post("/login", summary="Login with email and password")
+@router.post(
+    "/login",
+    summary="Login with email and password",
+    dependencies=[Depends(RateLimiter(times=15, seconds=60, scope="auth:login"))],
+)
 async def login(
     body: LoginRequest,
     request: Request,
@@ -113,7 +122,11 @@ async def logout(
     return success_response(message="Logged out successfully; session revoked")
 
 
-@router.post("/refresh", summary="Refresh session and rotate token")
+@router.post(
+    "/refresh",
+    summary="Refresh session and rotate token",
+    dependencies=[Depends(RateLimiter(times=45, seconds=60, scope="auth:refresh"))],
+)
 async def refresh_token(
     body: RefreshRequest,
     request: Request,
@@ -167,7 +180,11 @@ async def get_me(
     return success_response(data=data, message="User profile retrieved")
 
 
-@router.post("/request-password-reset", summary="Request password reset token")
+@router.post(
+    "/request-password-reset",
+    summary="Request password reset token",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, scope="auth:reset"))],
+)
 async def request_password_reset(
     body: PasswordResetRequest,
     request: Request,
@@ -187,7 +204,11 @@ async def request_password_reset(
     return success_response(data=resp, message="Password reset processed")
 
 
-@router.post("/reset-password", summary="Reset password with valid token")
+@router.post(
+    "/reset-password",
+    summary="Reset password with valid token",
+    dependencies=[Depends(RateLimiter(times=10, seconds=60, scope="auth:reset"))],
+)
 async def reset_password(
     body: PasswordResetConfirmRequest,
     request: Request,
@@ -203,7 +224,11 @@ async def reset_password(
     return success_response(message="Password reset successful. All active sessions invalidated.")
 
 
-@router.post("/verify-email", summary="Verify email address")
+@router.post(
+    "/verify-email",
+    summary="Verify email address",
+    dependencies=[Depends(RateLimiter(times=20, seconds=60, scope="auth:verify"))],
+)
 async def verify_email(
     body: EmailVerificationRequest,
     request: Request,

@@ -61,7 +61,7 @@ class PaginationParams(BaseModel):
 class HealthData(BaseModel):
     """Health check data."""
 
-    app: str = "VulnScanBackend"
+    app: str = "VulnScan"
     version: str = "0.1.0"
     environment: str = "development"
     database: str = "unknown"

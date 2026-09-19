@@ -1,0 +1,55 @@
+name: "VulnScan Security Scan & Gate Check"
+description: "Trigger automated VulnScan security analysis and enforce project security gates"
+author: "VulnScan"
+
+inputs:
+  api-url:
+    description: "Platform backend base URL"
+    required: true
+  api-key:
+    description: "API Key for authentication (store in GitHub secrets)"
+    required: true
+  project-id:
+    description: "Project identifier (e.g. prj_...)"
+    required: true
+  branch:
+    description: "Branch being analyzed"
+    required: false
+    default: "${{ github.ref_name }}"
+  commit-sha:
+    description: "Commit SHA being analyzed"
+    required: false
+    default: "${{ github.sha }}"
+  timeout:
+    description: "Timeout in seconds to wait for scan completion"
+    required: false
+    default: "300"
+
+outputs:
+  gate-result:
+    description: "Verdict of the security gate (PASSED, FAILED)"
+    value: "${{ steps.run-scan.outputs.gate_result }}"
+  scan-id:
+    description: "ID of the executed scan"
+    value: "${{ steps.run-scan.outputs.scan_id }}"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Execute Security Scan & Gate Check
+      id: run-scan
+      shell: bash
+      run: |
+        python3 cli/security_cli.py scan \
+          --api-url "${{ inputs.api-url }}" \
+          --api-key "${{ inputs.api-key }}" \
+          --project "${{ inputs.project-id }}" \
+          --branch "${{ inputs.branch }}" \
+          --commit "${{ inputs.commit-sha }}" \
+          --wait \
+          --timeout "${{ inputs.timeout }}"

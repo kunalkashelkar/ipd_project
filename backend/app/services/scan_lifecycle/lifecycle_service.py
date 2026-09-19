@@ -217,3 +217,42 @@ class ScanLifecycleService:
             target_stage=ScanStage.QUEUED,
             metadata={"requeued_attempt": scan.stage_attempt},
         )
+
+    async def cleanup_stale_scans(self, max_stale_seconds: int = 1800) -> list[uuid.UUID]:
+        """Detect and fail scans that have ceased heartbeating or timed out due to worker crash.
+
+        Scans in active stages whose heartbeat_at (or started_at/created_at) is older than
+        max_stale_seconds are transitioned to TIMED_OUT with code WORKER_UNRESPONSIVE.
+        """
+        now = datetime.now(timezone.utc)
+        stmt = (
+            select(Scan)
+            .where(
+                Scan.status.in_(["running", "queued"]),
+            )
+        )
+        res = await self.db.execute(stmt)
+        active_scans = res.scalars().all()
+        recovered: list[uuid.UUID] = []
+        for scan in active_scans:
+            last_activity = scan.heartbeat_at or scan.started_at or scan.created_at
+            if last_activity:
+                if last_activity.tzinfo is None:
+                    last_activity = last_activity.replace(tzinfo=timezone.utc)
+                age = (now - last_activity).total_seconds()
+                if age > max_stale_seconds:
+                    logger.warning(
+                        "Cleaning up stale scan {id} (last active {age:.1f}s ago)",
+                        id=scan.id,
+                        age=age,
+                    )
+                    await self.transition_stage(
+                        scan.id,
+                        target_stage=ScanStage.TIMED_OUT,
+                        error_code="WORKER_UNRESPONSIVE",
+                        error_message=f"Scan heartbeat expired after {int(age)}s without worker activity.",
+                        force=True,
+                    )
+                    recovered.append(scan.id)
+        return recovered
+

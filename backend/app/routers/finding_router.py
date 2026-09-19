@@ -657,6 +657,24 @@ async def assign_finding(
         resource_id=str(finding_id),
         metadata={"assigned_to": str(body.user_id)},
     )
+
+    # Notify assigned user if assigned by someone else
+    if body.user_id != current_user.id:
+        from backend.app.services.notification_service import NotificationService
+        notif_svc = NotificationService(db)
+        await notif_svc.create_notification(
+            user_id=body.user_id,
+            organization_id=project.organization_id,
+            type="finding_assigned",
+            title="Finding Assigned to You",
+            body=f"{current_user.name or current_user.email} assigned finding {finding.public_id} ({finding.title}) to you.",
+            severity="info",
+            entity_type="finding",
+            entity_id=finding.id,
+            link_url=f"/findings/{finding.public_id}",
+            event_key=f"assign:{finding.id}:{body.user_id}:{new_assignment.id}",
+        )
+
     await db.commit()
 
     return success_response(
@@ -673,8 +691,8 @@ async def add_finding_comment(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a collaboration comment to a finding."""
-    finding, _, member = finding_context
+    """Add a collaboration comment to a finding with @mention detection."""
+    finding, project, member = finding_context
     _verify_member_permission(member, "finding.read")
 
     comment = FindingComment(
@@ -692,12 +710,120 @@ async def add_finding_comment(
         resource_type="finding",
         resource_id=str(finding_id),
     )
+
+    # Detect @username mentions and notify organization members
+    import re
+    from backend.app.services.notification_service import NotificationService
+    mentions = set(re.findall(r"@([a-zA-Z0-9_\-\.]+)", body.content))
+    if mentions:
+        notif_svc = NotificationService(db)
+        for handle in mentions:
+            u_stmt = (
+                select(User)
+                .join(OrganizationMember, OrganizationMember.user_id == User.id)
+                .where(
+                    OrganizationMember.organization_id == project.organization_id,
+                    OrganizationMember.status == "active",
+                    (User.email.ilike(f"{handle}%")) | (User.name.ilike(f"%{handle}%")),
+                )
+            )
+            u_res = await db.execute(u_stmt)
+            mentioned_user = u_res.scalar_one_or_none()
+            if mentioned_user and mentioned_user.id != current_user.id:
+                await notif_svc.notify_user_mentioned(
+                    comment_id=comment.id,
+                    finding_id=finding.id,
+                    finding_public_id=finding.public_id,
+                    mentioned_user_id=mentioned_user.id,
+                    author_name=current_user.name or current_user.email,
+                    organization_id=project.organization_id,
+                )
+
     await db.commit()
 
     return success_response(
         data=FindingCommentResponse.model_validate(comment).model_dump(mode="json"),
         message="Comment added successfully",
         status_code=201,
+    )
+
+
+@router.get("/findings/{finding_id}/activity", summary="Get finding activity stream")
+async def get_finding_activity(
+    finding_id: uuid.UUID,
+    finding_context: tuple[Finding, Project, OrganizationMember] = Depends(require_finding_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve full chronological activity stream for a finding."""
+    finding, project, member = finding_context
+    _verify_member_permission(member, "finding.read")
+
+    activities = []
+
+    # 1. Status history
+    hist_stmt = (
+        select(FindingStatusHistory)
+        .options(selectinload(FindingStatusHistory.actor))
+        .where(FindingStatusHistory.finding_id == finding_id)
+    )
+    hist_res = await db.execute(hist_stmt)
+    for h in hist_res.scalars().all():
+        actor_name = h.actor.name or h.actor.email if h.actor else "System"
+        activities.append({
+            "id": f"status_{h.id}",
+            "activity_type": "status_change",
+            "title": f"Status changed to {h.new_status}",
+            "description": h.reason or f"Transitioned from {h.previous_status or 'INITIAL'}",
+            "actor_name": actor_name,
+            "created_at": h.created_at.isoformat() if h.created_at else None,
+            "metadata": {"new_status": h.new_status, "previous_status": h.previous_status},
+        })
+
+    # 2. Assignments
+    asg_stmt = (
+        select(FindingAssignment)
+        .options(selectinload(FindingAssignment.assigned_to), selectinload(FindingAssignment.assigned_by))
+        .where(FindingAssignment.finding_id == finding_id)
+    )
+    asg_res = await db.execute(asg_stmt)
+    for a in asg_res.scalars().all():
+        to_name = a.assigned_to.name or a.assigned_to.email if a.assigned_to else "User"
+        by_name = a.assigned_by.name or a.assigned_by.email if a.assigned_by else "System"
+        activities.append({
+            "id": f"asg_{a.id}",
+            "activity_type": "assignment",
+            "title": f"Assigned to {to_name}",
+            "description": f"Assigned by {by_name}",
+            "actor_name": by_name,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "metadata": {"assigned_to": to_name, "active": a.active},
+        })
+
+    # 3. Comments
+    com_stmt = (
+        select(FindingComment)
+        .options(selectinload(FindingComment.author))
+        .where(FindingComment.finding_id == finding_id)
+    )
+    com_res = await db.execute(com_stmt)
+    for c in com_res.scalars().all():
+        author_name = c.author.name or c.author.email if c.author else "User"
+        activities.append({
+            "id": f"com_{c.id}",
+            "activity_type": "comment",
+            "title": f"Comment from {author_name}",
+            "description": c.content,
+            "actor_name": author_name,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "metadata": {"author_id": str(c.author_id)},
+        })
+
+    # Sort chronological descending
+    activities.sort(key=lambda x: x["created_at"] or "", reverse=True)
+
+    return success_response(
+        data=activities,
+        message="Finding activity retrieved successfully",
     )
 
 

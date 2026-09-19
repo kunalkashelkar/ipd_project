@@ -1,5 +1,5 @@
 # ============================================================
-# Hybrid XAI Vulnerability Detection — pyproject.toml
+# VulnScan — pyproject.toml
 # ============================================================
 # Central Python project configuration.
 # Manages metadata, dependencies, build system, and tool configs.
@@ -10,9 +10,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hybrid-xai-vuln-detection"
+name = "vulnscan"
 version = "0.1.0"
-description = "Hybrid Explainable AI framework for software vulnerability detection combining program analysis (CPG, taint analysis) with Graph Neural Networks and XAI."
+description = "VulnScan — AI-assisted software vulnerability detection and remediation platform combining program analysis with Graph Neural Networks and XAI."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -101,8 +101,8 @@ docs = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kunal/hybrid-xai-vuln-detection"
-Documentation = "https://github.com/kunal/hybrid-xai-vuln-detection/tree/main/docs"
+Repository = "https://github.com/kunal/vulnscan"
+Documentation = "https://github.com/kunal/vulnscan/tree/main/docs"
 
 # ── Tool Configurations ──
 

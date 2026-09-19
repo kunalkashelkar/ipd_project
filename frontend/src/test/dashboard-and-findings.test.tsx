@@ -179,8 +179,87 @@ describe('Dashboard Component Consistency Pass', () => {
     });
 
     expect(
-      screen.getByText('Historical risk timelines will be available with Phase 7 analytics.')
+      screen.getByText('Historical risk trend is not available for this workspace yet.')
     ).toBeInTheDocument();
+  });
+
+  it('renders authoritative workspace Health Score on Dashboard when scored', async () => {
+    const mockMetrics: DashboardMetrics = {
+      total_projects: 2,
+      total_scans: 3,
+      completed_scans: 3,
+      failed_scans: 0,
+      total_vulnerabilities: 1,
+      severity_breakdown: { critical: 0, high: 1, medium: 0, low: 0, info: 0 },
+      recent_scans: [],
+      scan_success_rate: 100.0,
+      vulnerabilities_by_cwe: [],
+      health_score: 92.0,
+      health_rating: 'A',
+      health_status: 'SCORED',
+      score_version: 'v1.0.0',
+    };
+
+    vi.mocked(analyticsService.getDashboardMetrics).mockResolvedValue(mockMetrics);
+    vi.mocked(projectService.listProjects).mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 5,
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Security Health Score')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('92')).toBeInTheDocument();
+    expect(screen.getByText('Grade A')).toBeInTheDocument();
+    expect(screen.getByText('Authoritative workspace posture')).toBeInTheDocument();
+  });
+
+  it('renders NO_DATA / No data on Dashboard when workspace has no completed scans', async () => {
+    const mockMetrics: DashboardMetrics = {
+      total_projects: 1,
+      total_scans: 0,
+      completed_scans: 0,
+      failed_scans: 0,
+      total_vulnerabilities: 0,
+      severity_breakdown: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      recent_scans: [],
+      scan_success_rate: 0.0,
+      vulnerabilities_by_cwe: [],
+      health_score: null,
+      health_rating: null,
+      health_status: 'NO_DATA',
+      score_version: 'v1.0.0',
+    };
+
+    vi.mocked(analyticsService.getDashboardMetrics).mockResolvedValue(mockMetrics);
+    vi.mocked(projectService.listProjects).mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 5,
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Security Health Score')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('No data')).toBeInTheDocument();
+    expect(screen.getByText('Unscored — scan required')).toBeInTheDocument();
   });
 });
 

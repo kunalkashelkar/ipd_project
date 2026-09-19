@@ -107,6 +107,17 @@ class StorageService:
         clean_ext = ext if ext.startswith(".") else f".{ext}"
         return f"organizations/{org_id}/projects/{project_id}/remediations/{remediation_id}/validations/{validation_id}/logs{clean_ext}"
 
+    @staticmethod
+    def report_file_key(
+        org_id: uuid.UUID,
+        project_id: uuid.UUID,
+        report_public_id: str,
+        format: str,
+    ) -> str:
+        """organizations/{org_id}/projects/{project_id}/reports/{report_public_id}/report.{format}"""
+        clean_fmt = format.lower().lstrip(".")
+        return f"organizations/{org_id}/projects/{project_id}/reports/{report_public_id}/report.{clean_fmt}"
+
     # ── Storage Operations ──────────────────────────────────
 
     async def save_upload(

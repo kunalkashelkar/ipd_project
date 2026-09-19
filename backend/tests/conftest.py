@@ -17,6 +17,8 @@ os.environ["APP_ENV"] = "test"
 os.environ["SECRET_KEY"] = "test-secret-key-32-bytes-long-super-safe"
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["LOCAL_STORAGE_PATH"] = "./storage_test"
+os.environ["RATE_LIMITING_ENABLED"] = "false"
+
 
 from backend.app.core.config import get_settings
 from backend.app.core.security import create_token_pair, hash_password
@@ -24,6 +26,7 @@ from backend.app.database.base import Base
 from backend.app.database.session import get_db
 from backend.app.main import app
 from backend.app.models.organization import Organization, OrganizationMember
+from backend.app.models.project import Project
 from backend.app.models.rbac import Permission, Role, RolePermission
 from backend.app.models.user import User
 
@@ -41,7 +44,7 @@ async def seed_test_rbac(session: AsyncSession) -> dict[str, Role]:
     role_names = ["owner", "admin", "security_analyst", "developer", "viewer"]
     roles = {}
     for name in role_names:
-        r = Role(name=name, description=f"{name} role", is_system=True)
+        r = Role(id=uuid.uuid4(), name=name, description=f"{name} role", is_system=True)
         session.add(r)
         roles[name] = r
 
@@ -83,7 +86,7 @@ async def seed_test_rbac(session: AsyncSession) -> dict[str, Role]:
 
     perms = {}
     for k, cat in perm_keys:
-        p = Permission(key=k, description=k, category=cat)
+        p = Permission(id=uuid.uuid4(), key=k, description=k, category=cat)
         session.add(p)
         perms[k] = p
 
@@ -105,7 +108,7 @@ async def seed_test_rbac(session: AsyncSession) -> dict[str, Role]:
     for role_name, granted in mappings.items():
         role = roles[role_name]
         for g in granted:
-            rp = RolePermission(role_id=role.id, permission_id=perms[g].id)
+            rp = RolePermission(id=uuid.uuid4(), role_id=role.id, permission_id=perms[g].id)
             session.add(rp)
 
     await session.flush()
@@ -184,8 +187,38 @@ async def test_user(db_session: AsyncSession) -> User:
     return user
 
 
+@pytest_asyncio.fixture
+async def test_organization(db_session: AsyncSession, test_user: User) -> Organization:
+    """Provide the organization of the test user."""
+    stmt = (
+        select(Organization)
+        .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+        .where(OrganizationMember.user_id == test_user.id)
+    )
+    res = await db_session.execute(stmt)
+    return res.scalar_one()
+
+
+@pytest_asyncio.fixture
+async def test_project(db_session: AsyncSession, test_user: User, test_organization: Organization) -> Project:
+    """Provide a standard project in test_organization."""
+    project = Project(
+        id=uuid.uuid4(),
+        organization_id=test_organization.id,
+        name="Test Security Project",
+        owner_id=test_user.id,
+        language="python",
+        is_archived=False,
+    )
+    db_session.add(project)
+    await db_session.commit()
+    await db_session.refresh(project)
+    return project
+
+
 @pytest.fixture
 def auth_headers(test_user: User) -> dict[str, str]:
     """Generate authorization headers for the standard test user."""
     tokens = create_token_pair(str(test_user.id), test_user.email)
     return {"Authorization": f"Bearer {tokens['access_token']}"}
+

@@ -13,7 +13,7 @@ async def test_health_liveness(client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
-    assert data["data"]["app"] == "VulnScanBackend"
+    assert data["data"]["app"] == "VulnScan"
     assert data["data"]["status"] == "healthy"
 
 

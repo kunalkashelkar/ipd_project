@@ -25,7 +25,7 @@ export default function Landing() {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2 font-bold text-foreground">
             <ShieldCheck className="w-5 h-5 text-primary" />
-            XAI Tool
+            VulnScan
           </Link>
           <nav className="hidden md:flex gap-6 text-sm font-medium text-muted-foreground">
             <Link to="#" className="hover:text-foreground transition-colors">Features</Link>
@@ -99,7 +99,7 @@ export default function Landing() {
       </div>
 
       <footer className="text-center py-8 text-sm text-muted-foreground border-t border-border">
-        © {new Date().getFullYear()} XAI Tool. All rights reserved.
+        © {new Date().getFullYear()} VulnScan. All rights reserved.
       </footer>
     </div>
   );

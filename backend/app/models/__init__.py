@@ -15,7 +15,7 @@ from backend.app.models.organization import (
 )
 from backend.app.models.project import Project
 from backend.app.models.rbac import Permission, Role, RolePermission
-from backend.app.models.report import Report
+from backend.app.models.report import Report, ReportFile
 from backend.app.models.repository import Repository
 from backend.app.models.scan import Scan, ScanEvent, ScanStageRun
 from backend.app.models.scan_log import ScanLog
@@ -37,6 +37,11 @@ from backend.app.models.vulnerability import Vulnerability
 from backend.app.models.model_registry import ModelVersion
 from backend.app.models.explanation import AIExplanation
 from backend.app.models.remediation import Remediation, RemediationValidation
+from backend.app.models.security_gate import (
+    PRSecurityResult,
+    SecurityGatePolicy,
+    WebhookDelivery,
+)
 
 __all__ = [
     "AIExplanation",
@@ -57,11 +62,13 @@ __all__ = [
     "Organization",
     "OrganizationInvitation",
     "OrganizationMember",
+    "PRSecurityResult",
     "Permission",
     "Project",
     "Remediation",
     "RemediationValidation",
     "Report",
+    "ReportFile",
     "Repository",
     "RepositoryBranch",
     "RepositoryCommit",
@@ -72,6 +79,7 @@ __all__ = [
     "ScanLog",
     "ScanResult",
     "ScanStageRun",
+    "SecurityGatePolicy",
     "SourceFile",
     "SourceSnapshot",
     "Upload",
@@ -79,4 +87,5 @@ __all__ = [
     "UserSession",
     "VerificationToken",
     "Vulnerability",
+    "WebhookDelivery",
 ]

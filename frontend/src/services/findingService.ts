@@ -144,4 +144,9 @@ export const findingService = {
   async unsuppressFinding(findingId: string): Promise<void> {
     await apiClient.post(`/findings/${findingId}/unsuppress`);
   },
+
+  async getActivity(findingId: string): Promise<any[]> {
+    const { data } = await apiClient.get<any[]>(`/findings/${findingId}/activity`);
+    return data;
+  },
 };

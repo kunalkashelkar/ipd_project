@@ -94,7 +94,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col min-w-0">
           <span className="font-semibold text-sm tracking-tight text-foreground leading-none">
-            XAI Platform
+            VulnScan
           </span>
           <span className="text-[10px] text-muted-foreground font-mono mt-0.5">
             Security Intelligence

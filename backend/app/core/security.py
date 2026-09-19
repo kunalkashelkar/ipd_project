@@ -51,10 +51,10 @@ def hash_token(token: str) -> str:
 def generate_api_key() -> tuple[str, str, str]:
     """Generate an API key returning (full_secret_key, display_prefix, hash_for_db).
 
-    Key format: xai_live_<16-char-prefix>_<32-char-random>
+    Key format: vulnscan_<12-char-prefix>_<32-char-random>
     """
     prefix_rnd = secrets.token_hex(6)
-    prefix = f"xai_{prefix_rnd}"
+    prefix = f"vulnscan_{prefix_rnd}"
     secret = secrets.token_urlsafe(32)
     full_key = f"{prefix}_{secret}"
     key_hash = hash_token(full_key)
