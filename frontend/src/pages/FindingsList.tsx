@@ -64,19 +64,19 @@ export default function FindingsList() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-background border-y border-border">
+              <table className="w-full text-xs text-left">
+                <thead className="text-[11px] font-semibold text-muted-foreground uppercase bg-muted/30 border-y border-border">
                   <tr>
-                    <th className="px-6 py-4 font-medium">Finding ID</th>
-                    <th className="px-6 py-4 font-medium">Project</th>
-                    <th className="px-6 py-4 font-medium">Severity</th>
-                    <th className="px-6 py-4 font-medium">Title</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium">Action</th>
+                    <th className="px-5 py-3 font-medium">Severity</th>
+                    <th className="px-5 py-3 font-medium">Finding Title & Location</th>
+                    <th className="px-5 py-3 font-medium">CWE</th>
+                    <th className="px-5 py-3 font-medium">Project</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {findings.map((finding, i) => {
+                <tbody className="divide-y divide-border/50">
+                  {findings.map((finding) => {
                     const findingDisplayId = finding.public_id || finding.id;
                     const projectDisplay = finding.project_name || finding.project_public_id || finding.project_id;
                     const resultsUrl = getResultsUrl(
@@ -85,32 +85,64 @@ export default function FindingsList() {
                       finding.public_id || finding.id
                     );
 
+                    const severityColor =
+                      finding.severity === 'critical'
+                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                        : finding.severity === 'high'
+                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+                        : finding.severity === 'medium'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-sky-500/10 text-sky-400 border-sky-500/30';
+
                     return (
-                      <tr key={finding.id} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${i === findings.length - 1 ? 'border-b-0' : ''}`}>
-                        <td className="px-6 py-4 font-medium text-foreground font-mono text-xs" title={finding.id}>
-                          {findingDisplayId}
-                        </td>
-                        <td className="px-6 py-4">{projectDisplay}</td>
-                        <td className="px-6 py-4">
-                          <Badge
-                            variant={
-                              finding.severity === 'critical' || finding.severity === 'high' ? 'destructive' :
-                              finding.severity === 'medium' ? 'warning' : 'secondary'
-                            }
-                          >
+                      <tr key={finding.id} className="hover:bg-hover transition-colors group">
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${severityColor}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              finding.severity === 'critical' ? 'bg-rose-500' :
+                              finding.severity === 'high' ? 'bg-orange-500' :
+                              finding.severity === 'medium' ? 'bg-amber-500' : 'bg-sky-500'
+                            }`} />
                             {finding.severity}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <div className="font-medium text-foreground text-xs group-hover:text-primary transition-colors line-clamp-1" title={finding.title}>
+                            {finding.title}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
+                            <span>{findingDisplayId}</span>
+                            {finding.latest_file_path && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate max-w-[280px]">
+                                  {finding.latest_file_path}{finding.latest_line_number ? `:${finding.latest_line_number}` : ''}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3">
+                          {finding.cwe_id ? (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/40">
+                              {finding.cwe_id}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 font-medium text-foreground">
+                          {projectDisplay}
+                        </td>
+                        <td className="px-5 py-3">
+                          <Badge variant={finding.status === 'open' ? 'destructive' : 'safe'} className="text-[10px] capitalize">
+                            {finding.status}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 text-muted-foreground truncate max-w-xs" title={finding.title}>
-                          {finding.title}
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant={finding.status === 'open' ? 'destructive' : 'safe'}>{finding.status}</Badge>
-                        </td>
-                        <td className="px-6 py-4">
+                        <td className="px-5 py-3 text-right">
                           <Link to={resultsUrl}>
-                            <Button variant="outline" size="sm">
-                              View <ArrowRight className="w-3 h-3 ml-1" />
+                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 group-hover:text-primary">
+                              Investigate <ArrowRight className="w-3 h-3 ml-0.5" />
                             </Button>
                           </Link>
                         </td>

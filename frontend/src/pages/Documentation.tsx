@@ -28,6 +28,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button } from '../components/ui';
+import { VulnScanLogo } from '../components/VulnScanLogo';
 
 interface DocSection {
   id: string;
@@ -499,8 +500,8 @@ export default function Documentation() {
       <div className="border-b border-border/60 pb-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Shield className="w-5 h-5 text-primary" />
+            <div className="flex items-center gap-3 mb-1">
+              <VulnScanLogo variant="icon" size="sm" />
               <h1 className="text-2xl font-bold font-display tracking-tight text-foreground">
                 Platform Documentation
               </h1>

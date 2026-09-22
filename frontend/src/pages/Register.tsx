@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ShieldCheck, Mail, Lock, Building, User as UserIcon, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { VulnScanLogo } from '../components/VulnScanLogo';
 import { authService } from '../services/authService';
 import { useAuthStore } from '../store';
 import toast from 'react-hot-toast';
@@ -74,14 +75,11 @@ export default function Register() {
         transition={{ duration: 0.3 }}
         className="w-full max-w-md"
       >
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block group space-y-3">
-            <div className="w-12 h-12 mx-auto rounded-lg bg-primary flex items-center justify-center shadow-soft group-hover:scale-105 transition-transform">
-              <ShieldCheck className="w-7 h-7 text-primary-foreground" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">VulnScan</h1>
-          </Link>
-          <p className="mt-1 text-xs text-muted-foreground">Create your account and security workspace</p>
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-2">
+            <VulnScanLogo variant="full" size="xl" showSubtitle={true} subtitle="Developer Security Workstation" linkTo="/" />
+          </div>
+          <p className="text-xs text-muted-foreground">Create your account and security workspace</p>
         </div>
 
         <div className="bg-card rounded-lg p-8 sm:p-10 border border-border shadow-soft relative">

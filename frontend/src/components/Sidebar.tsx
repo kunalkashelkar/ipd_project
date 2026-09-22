@@ -63,6 +63,8 @@ const navSections: NavSection[] = [
   },
 ];
 
+import { VulnScanLogo } from './VulnScanLogo';
+
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -86,20 +88,17 @@ export function Sidebar() {
   const displayRole = rawRole ? rawRole.replace('_', ' ') : (user?.role ? user.role.replace('_', ' ') : 'Member');
 
   return (
-    <aside className="w-64 border-r border-border bg-sidebar flex flex-col h-screen fixed left-0 top-0 z-40 select-none">
+    <aside className="w-64 border-r border-border bg-sidebar flex flex-col h-screen fixed left-0 top-0 z-40 select-none shadow-soft">
       {/* Platform Branding */}
-      <div className="h-16 px-5 flex items-center gap-3 border-b border-border/50 shrink-0">
-        <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center shadow-soft">
-          <Shield className="w-4 h-4 text-primary-foreground" />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <span className="font-semibold text-sm tracking-tight text-foreground leading-none">
-            VulnScan
-          </span>
-          <span className="text-[10px] text-muted-foreground font-mono mt-0.5">
-            Security Intelligence
-          </span>
-        </div>
+      <div className="h-16 px-4 flex items-center border-b border-border shrink-0 bg-sidebar/80">
+        <VulnScanLogo
+          variant="full"
+          size="md"
+          showSubtitle={true}
+          subtitle="Security Intelligence"
+          linkTo="/dashboard"
+          className="hover:opacity-95 transition-opacity"
+        />
       </div>
 
       {/* Semantic Grouped Navigation */}

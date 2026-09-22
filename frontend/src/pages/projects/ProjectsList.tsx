@@ -121,6 +121,11 @@ export default function ProjectsList() {
                           <span className="group-hover:text-primary transition-colors font-medium">
                             {project.name}
                           </span>
+                          {project.public_id && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/40">
+                              {project.public_id}
+                            </span>
+                          )}
                         </div>
                         {project.description && (
                           <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 ml-6">
@@ -146,17 +151,24 @@ export default function ProjectsList() {
                         {new Date(project.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs gap-1 group-hover:bg-primary/10 group-hover:text-primary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(getProjectUrl(project));
-                          }}
-                        >
-                          View <ArrowRight className="w-3 h-3" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+                            onClick={() => navigate(getProjectUrl(project))}
+                          >
+                            Open
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs px-2 gap-1 text-primary hover:bg-primary/10"
+                            onClick={() => navigate(`${getProjectUrl(project)}/scan-config`)}
+                          >
+                            Scan <ArrowRight className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

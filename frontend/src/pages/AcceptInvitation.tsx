@@ -30,6 +30,7 @@ import { authService } from '../services/authService';
 import { organizationService } from '../services/organizationService';
 import { PREDEFINED_ROLES } from './Team';
 import toast from 'react-hot-toast';
+import { VulnScanLogo } from '../components/VulnScanLogo';
 
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
@@ -222,12 +223,12 @@ export default function AcceptInvitation() {
       <div className="w-full max-w-lg space-y-6">
         {/* Top Branding */}
         <div className="text-center space-y-2">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-soft">
-            <Building className="w-7 h-7" />
+          <div className="flex justify-center mb-1">
+            <VulnScanLogo variant="full" size="xl" showSubtitle={true} subtitle="Workspace Access Control" linkTo="/" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Workspace Invitation</h1>
-          <p className="text-sm text-muted-foreground">
-            AI-Powered Application Security & Explainable Vulnerability Detection
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Workspace Invitation</h1>
+          <p className="text-xs text-muted-foreground">
+            You've been invited to collaborate on application security in VulnScan
           </p>
         </div>
 

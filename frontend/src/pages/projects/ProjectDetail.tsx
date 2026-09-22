@@ -196,8 +196,13 @@ export default function ProjectDetail() {
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-4 border-b border-border/50">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl font-bold tracking-tight text-foreground">{project.name}</h1>
+            {project.public_id && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/50 flex items-center gap-1">
+                <span>{project.public_id}</span>
+              </span>
+            )}
             <Badge variant={project.is_archived ? 'secondary' : 'outline'} className="text-[10px]">
               {project.is_archived ? 'Archived' : 'Active'}
             </Badge>
@@ -220,33 +225,33 @@ export default function ProjectDetail() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {readySnapshots.length > 0 && (
+            <Link to={getScanConfigUrl(project)}>
+              <Button size="sm" className="text-xs gap-1.5 shadow-sm bg-primary text-primary-foreground hover:bg-primary/90">
+                <Play className="w-3.5 h-3.5 fill-current" />
+                Start Security Scan
+              </Button>
+            </Link>
+          )}
+
           <Link to={getConnectRepoUrl(project)}>
-            <Button size="sm" className="text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button size="sm" variant="outline" className="text-xs gap-1.5">
               <Plus className="w-3.5 h-3.5" />
-              Connect Repository
+              Connect Source
             </Button>
           </Link>
 
           <Button
             variant="ghost"
             size="sm"
-            className="text-xs gap-1.5 text-muted-foreground"
+            className="text-xs gap-1.5 text-muted-foreground hover:text-foreground"
             disabled={archiving}
             onClick={handleToggleArchive}
           >
             <Archive className="w-3.5 h-3.5" />
             {project.is_archived ? 'Unarchive' : 'Archive'}
           </Button>
-
-          {readySnapshots.length > 0 && (
-            <Link to={getScanConfigUrl(project)}>
-              <Button size="sm" variant="outline" className="text-xs gap-1.5">
-                <Play className="w-3.5 h-3.5" />
-                Run Security Scan
-              </Button>
-            </Link>
-          )}
         </div>
       </div>
 

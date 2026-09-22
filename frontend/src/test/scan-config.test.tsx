@@ -79,13 +79,12 @@ describe('ScanConfig UI Consistency Pass — Phase 4-6 Capability Status', () =>
       expect(screen.getByText('Configure Analysis Run')).toBeInTheDocument();
     });
 
-    // 1. Verify Status Badges: Included (Phase 4), Included (Phase 5), Included (Phase 6)
-    const phase4Badges = screen.getAllByText('Included (Phase 4)');
-    expect(phase4Badges).toHaveLength(2); // Static graph + Taint analysis
-
-    expect(screen.getByText('Included (Phase 5)')).toBeInTheDocument(); // AI detection
-    const phase6Badges = screen.getAllByText('Included (Phase 6)');
-    expect(phase6Badges).toHaveLength(2); // XAI + Remediation
+    // 1. Verify Status Badges: Native Engine, Active Pipeline, Inference Runtime, Attribution Engine, Sandbox Verification
+    expect(screen.getByText('Native Engine')).toBeInTheDocument();
+    expect(screen.getByText('Active Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Inference Runtime')).toBeInTheDocument();
+    expect(screen.getByText('Attribution Engine')).toBeInTheDocument();
+    expect(screen.getByText('Sandbox Verification')).toBeInTheDocument();
 
     // 2. Verify stale roadmap text is NOT present
     expect(screen.queryByText('Phase 5 Reserved')).not.toBeInTheDocument();

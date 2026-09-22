@@ -7,6 +7,8 @@ import { notificationService } from '../services/notificationService';
 import { projectService } from '../services/projectService';
 import { Organization } from '../types';
 import toast from 'react-hot-toast';
+import { VulnScanLogo } from './VulnScanLogo';
+import { CommandPalette } from './CommandPalette';
 
 const isUuid = (val: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
@@ -17,9 +19,21 @@ export function TopBar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
+
+  // Global shortcut for Cmd/Ctrl+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const paths = location.pathname.split('/').filter(Boolean);
 
@@ -104,11 +118,7 @@ export function TopBar() {
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    navigate(`/projects?search=${encodeURIComponent(searchQuery.trim())}`);
-  };
+
 
   return (
     <header className="h-16 px-6 flex items-center justify-between border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-30">
@@ -233,29 +243,40 @@ export function TopBar() {
       </div>
 
       {/* Right Action Area */}
-      <div className="flex items-center gap-3">
-        <form onSubmit={handleSearchSubmit} className="relative hidden sm:block">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search projects by name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 w-56 bg-muted/40 border border-border rounded-md pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-muted-foreground/60 text-foreground"
-          />
-        </form>
+      <div className="flex items-center gap-2.5">
+        {/* Command Palette Trigger Button */}
+        <button
+          type="button"
+          onClick={() => setIsCommandPaletteOpen(true)}
+          className="flex items-center gap-2 px-2.5 py-1.5 h-8 bg-card hover:bg-card-hover border border-border rounded-btn text-xs text-muted-foreground hover:text-foreground transition-all shadow-soft group"
+          title="Open Command Palette (Cmd/Ctrl + K)"
+        >
+          <Search className="w-3.5 h-3.5 text-primary shrink-0 group-hover:text-primary transition-colors" />
+          <span className="hidden sm:inline font-sans text-muted-foreground/90">Search platform...</span>
+          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground bg-sidebar border border-border/80 rounded">
+            ⌘K
+          </kbd>
+        </button>
 
+        {/* Notifications Icon with unread badge */}
         <button
           onClick={() => navigate('/notifications')}
           aria-label="View notifications"
-          className="relative w-8 h-8 flex items-center justify-center rounded-md hover:bg-hover transition-colors text-muted-foreground hover:text-foreground border border-border/50"
+          className="relative w-8 h-8 flex items-center justify-center rounded-btn hover:bg-card-hover transition-colors text-muted-foreground hover:text-foreground border border-border/70"
+          title="Notifications"
         >
-          <Bell className="w-4 h-4" />
+          <Bell className="w-3.5 h-3.5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full ring-2 ring-background" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-orange rounded-full ring-2 ring-background animate-pulse" />
           )}
         </button>
       </div>
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+      />
     </header>
   );
 }

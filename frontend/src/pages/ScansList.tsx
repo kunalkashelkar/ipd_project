@@ -61,50 +61,63 @@ export default function ScansList() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-background border-y border-border">
+              <table className="w-full text-xs text-left">
+                <thead className="text-[11px] font-semibold text-muted-foreground uppercase bg-muted/30 border-y border-border">
                   <tr>
-                    <th className="px-6 py-4 font-medium">Scan ID</th>
-                    <th className="px-6 py-4 font-medium">Project</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium">Progress</th>
-                    <th className="px-6 py-4 font-medium">Started</th>
-                    <th className="px-6 py-4 font-medium">Action</th>
+                    <th className="px-5 py-3 font-medium">Scan ID</th>
+                    <th className="px-5 py-3 font-medium">Project</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Progress</th>
+                    <th className="px-5 py-3 font-medium">Started</th>
+                    <th className="px-5 py-3 font-medium text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {scans.map((scan, i) => (
-                    <tr key={scan.id} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${i === scans.length - 1 ? 'border-b-0' : ''}`}>
-                      <td className="px-6 py-4 font-medium text-foreground font-mono text-xs">{scan.public_id || scan.id}</td>
-                      <td className="px-6 py-4">
+                <tbody className="divide-y divide-border/50">
+                  {scans.map((scan) => (
+                    <tr key={scan.id} className="hover:bg-hover transition-colors group">
+                      <td className="px-5 py-3 font-medium text-foreground font-mono text-xs">
+                        <span className="px-2 py-0.5 rounded bg-muted/60 text-foreground border border-border/40">
+                          {scan.public_id || scan.id}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
                         <Link
                           to={getProjectUrl(scan.project_public_id || scan.project_id)}
-                          className="hover:underline text-primary font-medium"
+                          className="hover:text-primary font-medium text-foreground transition-colors"
                         >
                           {scan.project_name || scan.project_public_id || scan.project_id}
                         </Link>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-5 py-3">
                         <Badge
                           variant={
                             scan.status === 'completed' ? 'safe' :
                             scan.status === 'failed' ? 'destructive' :
                             'warning'
                           }
+                          className="text-[10px] capitalize"
                         >
                           {scan.status}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground">
-                        {scan.progress}%
+                      <td className="px-5 py-3 text-muted-foreground font-mono text-[11px]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+                            <div
+                              className={`h-full ${scan.status === 'completed' ? 'bg-emerald-500' : scan.status === 'failed' ? 'bg-destructive' : 'bg-primary'}`}
+                              style={{ width: `${Math.min(100, Math.max(0, scan.progress))}%` }}
+                            />
+                          </div>
+                          <span>{scan.progress}%</span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-muted-foreground">
+                      <td className="px-5 py-3 text-muted-foreground font-mono text-[11px]">
                         {new Date(scan.created_at).toLocaleString()}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-5 py-3 text-right">
                         <Link to={getResultsUrl(scan.project_public_id || scan.project_id, scan.public_id || scan.id)}>
-                          <Button variant="outline" size="sm">
-                            View <ArrowRight className="w-3 h-3 ml-1" />
+                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 group-hover:text-primary">
+                            View Results <ArrowRight className="w-3 h-3 ml-0.5" />
                           </Button>
                         </Link>
                       </td>

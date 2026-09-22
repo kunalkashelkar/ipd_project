@@ -1,32 +1,84 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Sora:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 min-h-screen text-[14px];
+  :root {
+    --card: 217 33% 11%;
+    --foreground: 210 40% 96%;
+    --border: 217 33% 18%;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply font-display text-foreground;
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/30 min-h-screen text-[13.5px] leading-relaxed;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-foreground tracking-tight;
+  }
+
+  /* Monospace & Tabular numbers for technical precision */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer components {
-
-  /* Minimalist standardized components */
+  /* Workstation standard components */
   .btn-primary {
-    @apply px-4 py-2 bg-primary text-primary-foreground rounded-btn shadow-sm hover:bg-opacity-90 transition-all duration-200 font-medium whitespace-nowrap;
+    @apply px-3.5 py-1.5 bg-primary text-white rounded-btn shadow-sm hover:bg-primary-hover transition-all duration-150 font-medium text-xs inline-flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .interactive-card {
-    @apply bg-card border border-border rounded-card hover:bg-hover transition-colors duration-200 shadow-soft;
+    @apply bg-card border border-border rounded-card hover:bg-card-hover transition-colors duration-150 shadow-soft;
   }
+
+  .workstation-panel {
+    @apply bg-card border border-border rounded-card shadow-soft overflow-hidden;
+  }
+
+  /* High contrast table styles */
+  .workstation-table {
+    @apply w-full text-left text-xs border-collapse;
+  }
+
+  .workstation-table th {
+    @apply px-3.5 py-2.5 bg-sidebar font-semibold text-muted-foreground border-b border-border select-none uppercase text-[10px] tracking-wider;
+  }
+
+  .workstation-table td {
+    @apply px-3.5 py-2.5 border-b border-border/60 transition-colors;
+  }
+
+  .workstation-table tr:hover td {
+    @apply bg-card-hover/50;
+  }
+
+  /* Code line viewer */
+  .code-line-number {
+    @apply select-none text-right text-muted-foreground/60 font-mono text-xs pr-3 border-r border-border/40;
+  }
+
+  .code-line-vulnerable {
+    @apply bg-destructive/15 border-l-2 border-destructive text-destructive-foreground font-semibold;
+  }
+}
+
+/* Technical scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #212C3D;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
 }

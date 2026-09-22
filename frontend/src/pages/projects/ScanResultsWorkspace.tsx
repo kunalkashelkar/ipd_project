@@ -59,6 +59,7 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { VulnScanLogo } from '../../components/VulnScanLogo';
 import { scanService } from '../../services/scanService';
 import { findingService } from '../../services/findingService';
 import { projectService } from '../../services/projectService';
@@ -632,9 +633,9 @@ export default function ScanResultsWorkspace() {
             <ArrowLeft className="w-3.5 h-3.5" /> Back to {project?.name || 'Project'}
           </Link>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
-              Scan Results & Vulnerability Workspace
+            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+              <VulnScanLogo variant="icon" size="sm" />
+              <span>Vulnerability Investigation Workspace</span>
             </h1>
             <Badge variant="outline" className="text-xs uppercase font-mono">
               {scan.status}

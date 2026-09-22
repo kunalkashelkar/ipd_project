@@ -15,30 +15,55 @@ export default {
     },
     extend: {
       colors: {
-        background: "#0D1117",
-        foreground: "#F3F4F6",
-        sidebar: "#111827",
+        // High-end Security Operations Workstation surfaces
+        background: "#090D12",
+        foreground: "#F1F5F9",
+        sidebar: "#0D1219",
         card: {
-          DEFAULT: "#161B22",
-          secondary: "#1E293B",
+          DEFAULT: "#131923",
+          secondary: "#18202D",
+          elevated: "#18202D",
+          hover: "#1C2534",
         },
-        hover: "#21262D",
-        border: "#30363D",
+        hover: "#1C2534",
+        border: {
+          DEFAULT: "#212C3D",
+          subtle: "#16202C",
+          strong: "#334155",
+        },
+        // VulnScan brand accents inspired by the logo
+        brand: {
+          orange: "#F97316",
+          amber: "#F59E0B",
+          violet: "#8B5CF6",
+          purple: "#7C3AED",
+          cyan: "#06B6D4",
+        },
         primary: {
-          DEFAULT: "#3B82F6",
+          DEFAULT: "#0EA5E9",
+          hover: "#0284C7",
           foreground: "#ffffff",
         },
         secondary: {
           DEFAULT: "#94A3B8",
-          foreground: "#0D1117",
+          foreground: "#090D12",
         },
         muted: {
-          DEFAULT: "#1E293B",
+          DEFAULT: "#18202D",
           foreground: "#64748B",
         },
         destructive: {
-          DEFAULT: "#ef4444",
+          DEFAULT: "#EF4444",
           foreground: "#ffffff",
+        },
+        // Canonical Severity Tokens
+        severity: {
+          critical: "#EF4444",
+          high: "#F97316",
+          medium: "#F59E0B",
+          low: "#3B82F6",
+          info: "#06B6D4",
+          success: "#10B981",
         }
       },
       fontFamily: {
@@ -53,7 +78,10 @@ export default {
         'input': '6px',
       },
       boxShadow: {
-        'soft': '0 1px 3px rgba(0,0,0,0.2)',
+        'soft': '0 1px 3px rgba(0,0,0,0.3)',
+        'elevated': '0 4px 12px rgba(0,0,0,0.45)',
+        'glow-brand': '0 0 20px rgba(249,115,22,0.15)',
+        'glow-primary': '0 0 20px rgba(14,165,233,0.15)',
       },
     },
   },
