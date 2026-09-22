@@ -45,9 +45,9 @@ class ScanService:
         self,
         *,
         project_id: uuid.UUID,
-        source_snapshot_id: uuid.UUID | None = None,
-        upload_id: uuid.UUID | None = None,
-        repository_id: uuid.UUID | None = None,
+        source_snapshot_id: str | uuid.UUID | None = None,
+        upload_id: str | uuid.UUID | None = None,
+        repository_id: str | uuid.UUID | None = None,
         user_id: uuid.UUID,
         idempotency_key: str | None = None,
         config: dict[str, Any] | None = None,
@@ -83,8 +83,19 @@ class ScanService:
             raise ConflictError("Project already has an active scan running")
 
         # 3. Validate immutable snapshot
+        resolved_snapshot_id: uuid.UUID | None = None
+        snapshot: SourceSnapshot | None = None
         if source_snapshot_id:
-            stmt_snap = select(SourceSnapshot).where(SourceSnapshot.id == source_snapshot_id)
+            from backend.app.core.identifiers import is_valid_uuid
+            from sqlalchemy import or_
+
+            snap_str = str(source_snapshot_id).strip()
+            if is_valid_uuid(snap_str):
+                cond = or_(SourceSnapshot.id == uuid.UUID(snap_str), SourceSnapshot.public_id == snap_str)
+            else:
+                cond = (SourceSnapshot.public_id == snap_str)
+
+            stmt_snap = select(SourceSnapshot).where(cond)
             res_snap = await self.db.execute(stmt_snap)
             snapshot = res_snap.scalar_one_or_none()
             if snapshot is None or snapshot.project_id != project_id:
@@ -93,15 +104,36 @@ class ScanService:
                 raise ValidationError(
                     f"Cannot scan snapshot in '{snapshot.status}' state. Only READY snapshots can be scanned."
                 )
+            resolved_snapshot_id = snapshot.id
+
+        resolved_upload_id: uuid.UUID | None = None
+        if upload_id:
+            from backend.app.core.identifiers import is_valid_uuid
+
+            up_str = str(upload_id).strip()
+            if is_valid_uuid(up_str):
+                resolved_upload_id = uuid.UUID(up_str)
+            else:
+                raise ValidationError(f"Invalid upload_id: {upload_id}")
+
+        resolved_repository_id: uuid.UUID | None = None
+        if repository_id:
+            from backend.app.core.identifiers import is_valid_uuid
+
+            repo_str = str(repository_id).strip()
+            if is_valid_uuid(repo_str):
+                resolved_repository_id = uuid.UUID(repo_str)
+            else:
+                raise ValidationError(f"Invalid repository_id: {repository_id}")
 
         # 4. Create scan entity
         scan = Scan(
             id=uuid.uuid4(),
             project_id=project_id,
             organization_id=project.organization_id,
-            source_snapshot_id=source_snapshot_id,
-            upload_id=upload_id,
-            repository_id=repository_id,
+            source_snapshot_id=resolved_snapshot_id,
+            upload_id=resolved_upload_id,
+            repository_id=resolved_repository_id,
             created_by=user_id,
             status="queued",
             progress=5.0,
@@ -115,6 +147,12 @@ class ScanService:
         self.db.add(scan)
         await self.db.commit()
         await self.db.refresh(scan)
+
+        scan.project_name = project.name
+        scan.project_public_id = project.public_id
+        if resolved_snapshot_id and snapshot:
+            scan.source_snapshot_version = snapshot.source_version
+            scan.source_snapshot_public_id = snapshot.public_id
 
         # 5. Insert initial stage run & event records
         initial_run = ScanStageRun(
@@ -131,7 +169,7 @@ class ScanService:
             scan_id=scan.id,
             event_type="scan.queued",
             stage="queued",
-            payload={"source_snapshot_id": str(source_snapshot_id) if source_snapshot_id else None},
+            payload={"source_snapshot_id": str(resolved_snapshot_id) if resolved_snapshot_id else None},
         )
         self.db.add(initial_event)
         await self.db.commit()
@@ -144,7 +182,7 @@ class ScanService:
             resource_id=str(scan.id),
             metadata={
                 "project_id": str(project_id),
-                "source_snapshot_id": str(source_snapshot_id) if source_snapshot_id else None,
+                "source_snapshot_id": str(resolved_snapshot_id) if resolved_snapshot_id else None,
             },
         )
 

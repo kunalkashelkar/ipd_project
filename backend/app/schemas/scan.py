@@ -13,10 +13,10 @@ from pydantic import BaseModel, Field
 class ScanCreate(BaseModel):
     """Create a new scan."""
 
-    project_id: uuid.UUID
-    source_snapshot_id: uuid.UUID | None = None
-    upload_id: uuid.UUID | None = None
-    repository_id: uuid.UUID | None = None
+    project_id: str | uuid.UUID
+    source_snapshot_id: str | uuid.UUID | None = None
+    upload_id: str | uuid.UUID | None = None
+    repository_id: str | uuid.UUID | None = None
     idempotency_key: str | None = None
     config: dict | None = None
 

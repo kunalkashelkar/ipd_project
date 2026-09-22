@@ -194,7 +194,7 @@ async def get_repository_detail(
 )
 async def list_repository_branches(
     repo_id: uuid.UUID,
-    project_id: uuid.UUID | None = None,
+    project_id: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_org_id: uuid.UUID = Depends(resolve_active_organization),
@@ -276,7 +276,7 @@ async def select_repository_branch(
 )
 async def list_repository_commits(
     repo_id: uuid.UUID,
-    project_id: uuid.UUID | None = None,
+    project_id: str | None = None,
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

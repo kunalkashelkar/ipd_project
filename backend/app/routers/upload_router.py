@@ -22,7 +22,7 @@ router = APIRouter(prefix="/uploads", tags=["Uploads"])
 
 @router.post("", summary="Upload a file for a project", status_code=status.HTTP_201_CREATED)
 async def upload_file(
-    project_id: uuid.UUID = Form(...),
+    project_id: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -38,7 +38,7 @@ async def upload_file(
     service = UploadService(db)
     upload = await service.upload_file(
         file=file,
-        project_id=project_id,
+        project_id=project.id,
         user_id=current_user.id,
     )
     return success_response(
@@ -50,18 +50,18 @@ async def upload_file(
 
 @router.get("", summary="List uploads for a project")
 async def list_uploads(
-    project_id: uuid.UUID = Query(...),
+    project_id: str = Query(...),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List all uploads for a specific project."""
-    await require_project_access(project_id, current_user, db)
+    project, _ = await require_project_access(project_id, current_user, db)
 
     service = UploadService(db)
     uploads, total = await service.list_uploads(
-        project_id, page=page, page_size=page_size
+        project.id, page=page, page_size=page_size
     )
     return paginated_response(
         items=[UploadResponse.model_validate(u).model_dump(mode="json") for u in uploads],
